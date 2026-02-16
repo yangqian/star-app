@@ -12,9 +12,9 @@
         <a href="/" class="logo" data-i18n="star_tracker">⭐ Star Tracker</a>
         {{if .User}}
         <div class="nav-right">
-            <span>{{.User.Username}}</span>
-            <a href="/password" data-i18n="password">Password</a>
+            <span class="user-name" data-en="{{index .User.Translations "en"}}" data-zh-cn="{{index .User.Translations "zh-CN"}}" data-zh-tw="{{index .User.Translations "zh-TW"}}">{{if index .User.Translations "en"}}{{index .User.Translations "en"}}{{else}}{{.User.Username}}{{end}}</span>
             {{if .User.IsAdmin}}<a href="/admin" data-i18n="admin">Admin</a>{{end}}
+            <a href="/password" data-i18n="password">Password</a>
             <form method="POST" action="/logout" style="display:inline">
                 <button type="submit" class="btn-link" data-i18n="logout">Logout</button>
             </form>

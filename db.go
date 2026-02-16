@@ -262,11 +262,22 @@ func getUserByUsername(username string) (*User, error) {
 
 func getUserByID(id int) (*User, error) {
 	u := &User{}
+	u.Translations = make(map[string]string)
 	err := db.QueryRow("SELECT id, username, password_hash, is_admin FROM users WHERE id = ?", id).
 		Scan(&u.ID, &u.Username, &u.PasswordHash, &u.IsAdmin)
 	if err != nil {
 		return nil, err
 	}
+
+	// Load all translations for this user
+	tRows, _ := db.Query("SELECT lang, text FROM user_translations WHERE user_id = ?", u.ID)
+	defer tRows.Close()
+	for tRows.Next() {
+		var lang, text string
+		tRows.Scan(&lang, &text)
+		u.Translations[lang] = text
+	}
+
 	return u, nil
 }
 
