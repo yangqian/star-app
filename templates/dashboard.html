@@ -1,0 +1,82 @@
+{{define "content"}}
+<h1>Family Star Board</h1>
+
+<div class="star-counts">
+    {{range .StarCounts}}
+    <div class="member-card" data-username="{{.Username}}" onclick="selectUser('{{.Username}}')" title="Click to select">
+        <h2>{{.Username}}</h2>
+        <div class="star-number">{{.CurrentStars}}</div>
+        <div class="star-label">current stars</div>
+        <div class="star-total">{{.StarCount}} total earned</div>
+    </div>
+    {{end}}
+</div>
+
+<div class="action-bar" id="actionBar" style="display:none;">
+    <span>Selected: <strong id="selectedName"></strong></span>
+    <button onclick="toggleReasonPanel()">Award Star</button>
+</div>
+
+<div class="reason-panel" id="reasonPanel" style="display:none;">
+    <h3>Choose a reason</h3>
+    <div class="reason-list">
+        {{range .Reasons}}
+        <div class="reason-item" onclick="submitStar('{{.Text}}')">{{.Text}} <span class="reason-count">({{.Count}})</span></div>
+        {{end}}
+    </div>
+    <div class="reason-custom">
+        <input type="text" id="customReason" placeholder="Custom reason...">
+        <button onclick="submitStar(document.getElementById('customReason').value)">Add</button>
+    </div>
+</div>
+
+<h2>Rewards</h2>
+<div class="rewards-grid">
+    {{range .Rewards}}
+    <div class="reward-card" onclick="redeemReward({{.ID}}, '{{.Name}}', {{.Cost}})">
+        <div class="reward-icon">{{.Icon}}</div>
+        <div class="reward-name">{{.Name}}</div>
+        <div class="reward-cost">{{.Cost}} ⭐</div>
+    </div>
+    {{end}}
+</div>
+
+<h2>Recent Redemptions</h2>
+<table>
+    <thead>
+        <tr><th>Who</th><th>Reward</th><th>Cost</th><th>When</th></tr>
+    </thead>
+    <tbody>
+        {{range .Redemptions}}
+        <tr>
+            <td>{{.Username}}</td>
+            <td>{{.RewardName}}</td>
+            <td>{{.Cost}} ⭐</td>
+            <td>{{.CreatedAt.Format "Jan 2 15:04"}}</td>
+        </tr>
+        {{else}}
+        <tr><td colspan="4">No redemptions yet!</td></tr>
+        {{end}}
+    </tbody>
+</table>
+
+<h2>Recent Stars</h2>
+<table>
+    <thead>
+        <tr><th>Who</th><th>Reason</th><th>Awarded By</th><th>When</th></tr>
+    </thead>
+    <tbody>
+        {{range .Stars}}
+        <tr>
+            <td>{{.Username}}</td>
+            <td>{{.Reason}}</td>
+            <td>{{.AwardedByName}}</td>
+            <td>{{.CreatedAt.Format "Jan 2 15:04"}}</td>
+        </tr>
+        {{else}}
+        <tr><td colspan="4">No stars yet!</td></tr>
+        {{end}}
+    </tbody>
+</table>
+{{end}}
+{{template "layout" .}}

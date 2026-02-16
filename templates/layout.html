@@ -1,0 +1,25 @@
+{{define "layout"}}<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Star Tracker</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <nav>
+        <a href="/" class="logo">⭐ Star Tracker</a>
+        {{if .User}}
+        <div class="nav-right">
+            <span>{{.User.Username}}</span>
+            {{if .User.IsAdmin}}<a href="/admin">Admin</a>{{end}}
+            <form method="POST" action="/logout" style="display:inline">
+                <button type="submit" class="btn-link">Logout</button>
+            </form>
+        </div>
+        {{end}}
+    </nav>
+    <main>{{template "content" .}}</main>
+    <script src="/static/app.js"></script>
+</body>
+</html>{{end}}

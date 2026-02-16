@@ -1,0 +1,12 @@
+{{define "content"}}
+<div class="login-box">
+    <h1>⭐ Star Tracker</h1>
+    {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+    <form method="POST" action="/login">
+        <input type="text" name="username" placeholder="Username" required autofocus>
+        <input type="password" name="password" placeholder="Password" required>
+        <button type="submit">Login</button>
+    </form>
+</div>
+{{end}}
+{{template "layout" .}}

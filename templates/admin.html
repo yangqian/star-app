@@ -1,0 +1,59 @@
+{{define "content"}}
+<h1>Admin Panel</h1>
+
+<section>
+    <h2>Award a Star</h2>
+    <form method="POST" action="/admin/star">
+        <label>Family Member</label>
+        <select name="username" required>
+            <option value="">Select...</option>
+            {{range .Users}}
+            <option value="{{.Username}}">{{.Username}}</option>
+            {{end}}
+        </select>
+
+        <label>Reason</label>
+        <input type="text" name="reason" id="reason-input" list="reason-list" placeholder="What did they do?" required>
+        <datalist id="reason-list">
+            {{range .Reasons}}
+            <option value="{{.Text}}">
+            {{end}}
+        </datalist>
+
+        <button type="submit">Award Star</button>
+    </form>
+</section>
+
+<section>
+    <h2>API Keys</h2>
+    {{if .NewKey}}
+    <div class="alert">
+        New API key (copy now, shown only once):<br>
+        <code id="new-key">{{.NewKey}}</code>
+    </div>
+    {{end}}
+
+    <form method="POST" action="/admin/apikey">
+        <input type="text" name="label" placeholder="Label (e.g. Home Assistant)" required>
+        <button type="submit">Generate Key</button>
+    </form>
+
+    <table>
+        <thead><tr><th>Label</th><th>Created</th><th>Action</th></tr></thead>
+        <tbody>
+            {{range .APIKeys}}
+            <tr>
+                <td>{{.Label}}</td>
+                <td>{{.CreatedAt.Format "Jan 2, 2006"}}</td>
+                <td>
+                    <button class="btn-danger" onclick="deleteKey({{.ID}})">Revoke</button>
+                </td>
+            </tr>
+            {{else}}
+            <tr><td colspan="3">No API keys</td></tr>
+            {{end}}
+        </tbody>
+    </table>
+</section>
+{{end}}
+{{template "layout" .}}
