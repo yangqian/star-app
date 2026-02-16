@@ -41,7 +41,19 @@ function updateSelection() {
     var awardable = getSelectedNonSelf();
     if (selectedUsers.length > 0) {
         actionBar.style.display = 'flex';
-        document.getElementById('selectedName').textContent = selectedUsers.join(', ');
+        // Get translated names for selected users
+        var translatedNames = selectedUsers.map(function(username) {
+            var card = document.querySelector('.member-card[data-username="' + username + '"]');
+            if (card) {
+                var nameEl = card.querySelector('.user-name');
+                if (nameEl) {
+                    var langKey = currentLang === 'zh-CN' ? 'zh-cn' : (currentLang === 'zh-TW' ? 'zh-tw' : 'en');
+                    return nameEl.getAttribute('data-' + langKey) || username;
+                }
+            }
+            return username;
+        });
+        document.getElementById('selectedName').textContent = translatedNames.join(', ');
         var buttons = actionBar.querySelectorAll('button');
         buttons.forEach(function(b) { b.style.display = awardable.length > 0 ? '' : 'none'; });
     } else {

@@ -71,7 +71,8 @@ var translations = {
         count: "Count",
         award: "Award",
         no_reasons: "No reasons used yet",
-        award_custom: "Award Custom"
+        award_custom: "Award Custom",
+        account: "Account"
     },
     "zh-CN": {
         star_tracker: "⭐ 星星记录",
@@ -145,7 +146,8 @@ var translations = {
         count: "次数",
         award: "奖励",
         no_reasons: "暂无使用过的原因",
-        award_custom: "自定义奖励"
+        award_custom: "自定义奖励",
+        account: "账户"
     },
     "zh-TW": {
         star_tracker: "⭐ 星星記錄",
@@ -219,7 +221,8 @@ var translations = {
         count: "次數",
         award: "獎勵",
         no_reasons: "暫無使用過的原因",
-        award_custom: "自訂獎勵"
+        award_custom: "自訂獎勵",
+        account: "帳戶"
     }
 };
 
@@ -270,6 +273,8 @@ function applyLang() {
     });
     // Update time displays
     formatLocalTimes();
+    // Update selected names display
+    updateSelectedNamesDisplay();
     // Update star history reasons
     document.querySelectorAll('.star-reason').forEach(function(el) {
         var text = el.getAttribute('data-' + langKey) || el.getAttribute('data-en');
@@ -303,6 +308,24 @@ function formatLocalTimes() {
             el.textContent = formatted;
         }
     });
+}
+
+function updateSelectedNamesDisplay() {
+    var selectedNameEl = document.getElementById('selectedName');
+    if (!selectedNameEl || typeof selectedUsers === 'undefined' || selectedUsers.length === 0) return;
+
+    var langKey = currentLang === 'zh-CN' ? 'zh-cn' : (currentLang === 'zh-TW' ? 'zh-tw' : 'en');
+    var translatedNames = selectedUsers.map(function(username) {
+        var card = document.querySelector('.member-card[data-username="' + username + '"]');
+        if (card) {
+            var nameEl = card.querySelector('.user-name');
+            if (nameEl) {
+                return nameEl.getAttribute('data-' + langKey) || username;
+            }
+        }
+        return username;
+    });
+    selectedNameEl.textContent = translatedNames.join(', ');
 }
 
 document.addEventListener('DOMContentLoaded', applyLang);

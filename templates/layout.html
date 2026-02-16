@@ -12,12 +12,8 @@
         <a href="/" class="logo" data-i18n="star_tracker">⭐ Star Tracker</a>
         {{if .User}}
         <div class="nav-right">
-            <span class="user-name" data-en="{{index .User.Translations "en"}}" data-zh-cn="{{index .User.Translations "zh-CN"}}" data-zh-tw="{{index .User.Translations "zh-TW"}}">{{if index .User.Translations "en"}}{{index .User.Translations "en"}}{{else}}{{.User.Username}}{{end}}</span>
+            <a href="/account" class="user-name" data-en="{{index .User.Translations "en"}}" data-zh-cn="{{index .User.Translations "zh-CN"}}" data-zh-tw="{{index .User.Translations "zh-TW"}}">{{if index .User.Translations "en"}}{{index .User.Translations "en"}}{{else}}{{.User.Username}}{{end}}</a>
             {{if .User.IsAdmin}}<a href="/admin" data-i18n="admin">Admin</a>{{end}}
-            <a href="/password" data-i18n="password">Password</a>
-            <form method="POST" action="/logout" style="display:inline">
-                <button type="submit" class="btn-link" data-i18n="logout">Logout</button>
-            </form>
             <span class="lang-switch">
                 <a href="#" class="lang-btn" data-lang="en" onclick="setLang('en');return false">EN</a>
                 <a href="#" class="lang-btn" data-lang="zh-CN" onclick="setLang('zh-CN');return false">简</a>

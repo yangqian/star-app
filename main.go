@@ -36,7 +36,7 @@ func main() {
 	}
 
 	templates = make(map[string]*template.Template)
-	for _, page := range []string{"login.html", "dashboard.html", "admin.html", "password.html"} {
+	for _, page := range []string{"login.html", "dashboard.html", "admin.html", "password.html", "account.html"} {
 		templates[page] = template.Must(template.ParseFS(templateFS, "templates/layout.html", "templates/"+page))
 	}
 
@@ -51,6 +51,8 @@ func main() {
 	mux.HandleFunc("GET /login", handleLoginPage)
 	mux.HandleFunc("POST /login", handleLogin)
 	mux.HandleFunc("POST /logout", authWeb(handleLogout))
+	mux.HandleFunc("GET /account", authWeb(handleAccountPage))
+	mux.HandleFunc("POST /account/password", authWeb(handleAccountPasswordChange))
 	mux.HandleFunc("GET /password", authWeb(handlePasswordPage))
 	mux.HandleFunc("POST /password", authWeb(handlePasswordChange))
 	mux.HandleFunc("POST /star", authAdmin(handleQuickStar))

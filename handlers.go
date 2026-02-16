@@ -366,6 +366,49 @@ func handleDeleteRedemption(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, counts)
 }
 
+func handleAccountPage(w http.ResponseWriter, r *http.Request) {
+	user := getContextUser(r)
+	templates["account.html"].ExecuteTemplate(w, "account.html", map[string]interface{}{"User": user})
+}
+
+func handleAccountPasswordChange(w http.ResponseWriter, r *http.Request) {
+	user := getContextUser(r)
+	current := r.FormValue("current")
+	newPw := r.FormValue("new")
+	confirm := r.FormValue("confirm")
+
+	data := map[string]interface{}{"User": user}
+
+	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(current)) != nil {
+		data["Error"] = "Current password is incorrect"
+		templates["account.html"].ExecuteTemplate(w, "account.html", data)
+		return
+	}
+
+	if len(newPw) < 6 {
+		data["Error"] = "New password must be at least 6 characters"
+		templates["account.html"].ExecuteTemplate(w, "account.html", data)
+		return
+	}
+
+	if newPw != confirm {
+		data["Error"] = "New passwords do not match"
+		templates["account.html"].ExecuteTemplate(w, "account.html", data)
+		return
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPw), bcrypt.DefaultCost)
+	if err != nil {
+		data["Error"] = "Failed to update password"
+		templates["account.html"].ExecuteTemplate(w, "account.html", data)
+		return
+	}
+
+	updatePassword(user.ID, string(hash))
+	data["Success"] = "Password updated successfully"
+	templates["account.html"].ExecuteTemplate(w, "account.html", data)
+}
+
 func handlePasswordPage(w http.ResponseWriter, r *http.Request) {
 	user := getContextUser(r)
 	templates["password.html"].ExecuteTemplate(w, "password.html", map[string]interface{}{"User": user})

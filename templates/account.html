@@ -1,0 +1,33 @@
+{{define "content"}}
+<h1 data-i18n="account">Account</h1>
+
+<section>
+    <h2 data-i18n="change_password">Change Password</h2>
+    {{if .Error}}
+    <div class="error">{{.Error}}</div>
+    {{end}}
+    {{if .Success}}
+    <div class="alert">{{.Success}}</div>
+    {{end}}
+    <form method="POST" action="/account/password">
+        <label data-i18n="current_password">Current Password</label>
+        <input type="password" name="current" required>
+
+        <label data-i18n="new_password">New Password</label>
+        <input type="password" name="new" required minlength="6">
+
+        <label data-i18n="confirm_password">Confirm New Password</label>
+        <input type="password" name="confirm" required minlength="6">
+
+        <button type="submit" data-i18n="update_password">Update Password</button>
+    </form>
+</section>
+
+<section>
+    <h2 data-i18n="logout">Logout</h2>
+    <form method="POST" action="/logout">
+        <button type="submit" class="btn-danger" data-i18n="logout">Logout</button>
+    </form>
+</section>
+{{end}}
+{{template "layout" .}}
