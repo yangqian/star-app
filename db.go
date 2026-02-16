@@ -132,6 +132,11 @@ func seedRewards() error {
 	return nil
 }
 
+func updatePassword(userID int, newHash string) error {
+	_, err := db.Exec("UPDATE users SET password_hash = ? WHERE id = ?", newHash, userID)
+	return err
+}
+
 func getUserByUsername(username string) (*User, error) {
 	u := &User{}
 	err := db.QueryRow("SELECT id, username, password_hash, is_admin FROM users WHERE username = ?", username).
@@ -240,6 +245,11 @@ func addStar(username, reason string, awardedBy int) error {
 	return err
 }
 
+func deleteStar(id int) error {
+	_, err := db.Exec("DELETE FROM stars WHERE id = ?", id)
+	return err
+}
+
 func getReasons() ([]Reason, error) {
 	rows, err := db.Query("SELECT id, text, count FROM reasons ORDER BY count DESC")
 	if err != nil {
@@ -327,6 +337,21 @@ func getRewardsList() ([]Reward, error) {
 	return rewards, nil
 }
 
+func addReward(name string, cost int, icon string) error {
+	_, err := db.Exec("INSERT INTO rewards (name, cost, icon) VALUES (?, ?, ?)", name, cost, icon)
+	return err
+}
+
+func updateReward(id int, name string, cost int, icon string) error {
+	_, err := db.Exec("UPDATE rewards SET name = ?, cost = ?, icon = ? WHERE id = ?", name, cost, icon, id)
+	return err
+}
+
+func deleteRewardByID(id int) error {
+	_, err := db.Exec("DELETE FROM rewards WHERE id = ?", id)
+	return err
+}
+
 func getRewardByID(id int) (*Reward, error) {
 	r := &Reward{}
 	err := db.QueryRow("SELECT id, name, cost, icon FROM rewards WHERE id = ?", id).
@@ -350,13 +375,19 @@ func redeemReward(userID, rewardID int) error {
 	return err
 }
 
-func getRecentRedemptions(limit int) ([]Redemption, error) {
-	rows, err := db.Query(`
-		SELECT rd.id, rd.user_id, u.username, rw.name, rw.cost, rd.created_at
+func getRecentRedemptions(limit int, filterUserID int) ([]Redemption, error) {
+	query := `SELECT rd.id, rd.user_id, u.username, rw.name, rw.cost, rd.created_at
 		FROM redemptions rd
 		JOIN users u ON rd.user_id = u.id
-		JOIN rewards rw ON rd.reward_id = rw.id
-		ORDER BY rd.created_at DESC LIMIT ?`, limit)
+		JOIN rewards rw ON rd.reward_id = rw.id`
+	var args []interface{}
+	if filterUserID > 0 {
+		query += " WHERE rd.user_id = ?"
+		args = append(args, filterUserID)
+	}
+	query += " ORDER BY rd.created_at DESC LIMIT ?"
+	args = append(args, limit)
+	rows, err := db.Query(query, args...)
 	if err != nil {
 		return nil, err
 	}

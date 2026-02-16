@@ -20,28 +20,48 @@ func randomHex(n int) string {
 func handleDashboard(w http.ResponseWriter, r *http.Request) {
 	user := getContextUser(r)
 	counts, _ := getUserStarCounts()
-	stars, _ := getStars("")
 	rewards, _ := getRewardsList()
-	redemptions, _ := getRecentRedemptions(10)
-	users, _ := getAllUsers()
+	reasons, _ := getReasons()
 
-	// Filter to non-admin users for redemption target selection
-	var kids []User
-	for _, u := range users {
-		if !u.IsAdmin {
-			kids = append(kids, u)
-		}
+	// Kids only see their own data; admins see everything
+	var stars []Star
+	var redemptions []Redemption
+	if user.IsAdmin {
+		stars, _ = getStars("")
+		redemptions, _ = getRecentRedemptions(10, 0)
+	} else {
+		stars, _ = getStars(user.Username)
+		redemptions, _ = getRecentRedemptions(10, user.ID)
 	}
 
-	reasons, _ := getReasons()
+	// Consolidate sequential identical awards (same user + reason) into "N x reason"
+	type DisplayStar struct {
+		Star
+		Display string
+	}
+	var consolidated []DisplayStar
+	for i := 0; i < len(stars); {
+		j := i + 1
+		for j < len(stars) && stars[j].Username == stars[i].Username && stars[j].Reason == stars[i].Reason {
+			j++
+		}
+		count := j - i
+		ds := DisplayStar{Star: stars[i]}
+		if count > 1 {
+			ds.Display = fmt.Sprintf("%d × %s", count, stars[i].Reason)
+		} else {
+			ds.Display = stars[i].Reason
+		}
+		consolidated = append(consolidated, ds)
+		i = j
+	}
 
 	data := map[string]interface{}{
 		"User":        user,
 		"StarCounts":  counts,
-		"Stars":       stars,
+		"Stars":       consolidated,
 		"Rewards":     rewards,
 		"Redemptions": redemptions,
-		"Kids":        kids,
 		"Reasons":     reasons,
 	}
 	templates["dashboard.html"].ExecuteTemplate(w, "dashboard.html", data)
@@ -103,7 +123,21 @@ func handleQuickStar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if username == user.Username {
+		http.Error(w, "cannot award stars to yourself", http.StatusBadRequest)
+		return
+	}
+
 	addStar(username, reason, user.ID)
+
+	if r.Header.Get("Accept") == "application/json" {
+		counts, _ := getUserStarCounts()
+		jsonResponse(w, map[string]interface{}{
+			"counts":    counts,
+			"awardedBy": user.Username,
+		})
+		return
+	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
@@ -136,7 +170,72 @@ func handleRedeem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	redeemReward(user.ID, reward.ID)
+
+	if r.Header.Get("Accept") == "application/json" {
+		counts, _ := getUserStarCounts()
+		jsonResponse(w, map[string]interface{}{
+			"counts":     counts,
+			"rewardName": reward.Name,
+			"cost":       reward.Cost,
+		})
+		return
+	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func handleDeleteStar(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	deleteStar(id)
+	counts, _ := getUserStarCounts()
+	jsonResponse(w, counts)
+}
+
+func handlePasswordPage(w http.ResponseWriter, r *http.Request) {
+	user := getContextUser(r)
+	templates["password.html"].ExecuteTemplate(w, "password.html", map[string]interface{}{"User": user})
+}
+
+func handlePasswordChange(w http.ResponseWriter, r *http.Request) {
+	user := getContextUser(r)
+	current := r.FormValue("current")
+	newPw := r.FormValue("new")
+	confirm := r.FormValue("confirm")
+
+	data := map[string]interface{}{"User": user}
+
+	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(current)) != nil {
+		data["Error"] = "Current password is incorrect"
+		templates["password.html"].ExecuteTemplate(w, "password.html", data)
+		return
+	}
+
+	if len(newPw) < 6 {
+		data["Error"] = "New password must be at least 6 characters"
+		templates["password.html"].ExecuteTemplate(w, "password.html", data)
+		return
+	}
+
+	if newPw != confirm {
+		data["Error"] = "New passwords do not match"
+		templates["password.html"].ExecuteTemplate(w, "password.html", data)
+		return
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPw), bcrypt.DefaultCost)
+	if err != nil {
+		data["Error"] = "Failed to update password"
+		templates["password.html"].ExecuteTemplate(w, "password.html", data)
+		return
+	}
+
+	updatePassword(user.ID, string(hash))
+	data["Success"] = "Password updated successfully"
+	templates["password.html"].ExecuteTemplate(w, "password.html", data)
 }
 
 func handleAdmin(w http.ResponseWriter, r *http.Request) {
@@ -144,14 +243,55 @@ func handleAdmin(w http.ResponseWriter, r *http.Request) {
 	users, _ := getAllUsers()
 	reasons, _ := getReasons()
 	apiKeys, _ := getAPIKeys()
+	rewards, _ := getRewardsList()
 
 	data := map[string]interface{}{
 		"User":    user,
 		"Users":   users,
 		"Reasons": reasons,
 		"APIKeys": apiKeys,
+		"Rewards": rewards,
 	}
 	templates["admin.html"].ExecuteTemplate(w, "admin.html", data)
+}
+
+func handleAddReward(w http.ResponseWriter, r *http.Request) {
+	name := r.FormValue("name")
+	icon := r.FormValue("icon")
+	cost, err := strconv.Atoi(r.FormValue("cost"))
+	if err != nil || name == "" || cost <= 0 {
+		http.Error(w, "invalid reward", http.StatusBadRequest)
+		return
+	}
+	addReward(name, cost, icon)
+	http.Redirect(w, r, "/admin", http.StatusSeeOther)
+}
+
+func handleUpdateReward(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	name := r.FormValue("name")
+	icon := r.FormValue("icon")
+	cost, err := strconv.Atoi(r.FormValue("cost"))
+	if err != nil || name == "" || cost <= 0 {
+		http.Error(w, "invalid reward", http.StatusBadRequest)
+		return
+	}
+	updateReward(id, name, cost, icon)
+	http.Redirect(w, r, "/admin", http.StatusSeeOther)
+}
+
+func handleDeleteReward(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	deleteRewardByID(id)
+	w.WriteHeader(http.StatusOK)
 }
 
 func handleAddStar(w http.ResponseWriter, r *http.Request) {

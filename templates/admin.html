@@ -25,6 +25,39 @@
 </section>
 
 <section>
+    <h2>Rewards</h2>
+    <table>
+        <thead><tr><th>Icon</th><th>Name</th><th>Stars</th><th>Actions</th></tr></thead>
+        <tbody>
+            {{range .Rewards}}
+            <tr>
+                <form method="POST" action="/admin/reward/{{.ID}}" style="background:none;padding:0;margin:0;box-shadow:none;">
+                    <td><input type="text" name="icon" value="{{.Icon}}" style="width:3rem;text-align:center"></td>
+                    <td><input type="text" name="name" value="{{.Name}}" required></td>
+                    <td><input type="number" name="cost" value="{{.Cost}}" min="1" required style="width:5rem"></td>
+                    <td>
+                        <button type="submit">Save</button>
+                        <button type="button" class="btn-danger" onclick="deleteReward({{.ID}})">Delete</button>
+                    </td>
+                </form>
+            </tr>
+            {{else}}
+            <tr><td colspan="4">No rewards configured</td></tr>
+            {{end}}
+        </tbody>
+    </table>
+    <h3>Add Reward</h3>
+    <form method="POST" action="/admin/reward">
+        <div style="display:flex;gap:0.5rem;align-items:end;">
+            <div><label>Icon</label><input type="text" name="icon" placeholder="🎁" style="width:3rem;text-align:center"></div>
+            <div style="flex:1"><label>Name</label><input type="text" name="name" placeholder="Reward name" required></div>
+            <div><label>Stars</label><input type="number" name="cost" placeholder="5" min="1" required style="width:5rem"></div>
+            <button type="submit" style="margin-bottom:0.5rem">Add</button>
+        </div>
+    </form>
+</section>
+
+<section>
     <h2>API Keys</h2>
     {{if .NewKey}}
     <div class="alert">

@@ -36,7 +36,7 @@ func main() {
 	}
 
 	templates = make(map[string]*template.Template)
-	for _, page := range []string{"login.html", "dashboard.html", "admin.html"} {
+	for _, page := range []string{"login.html", "dashboard.html", "admin.html", "password.html"} {
 		templates[page] = template.Must(template.ParseFS(templateFS, "templates/layout.html", "templates/"+page))
 	}
 
@@ -51,12 +51,18 @@ func main() {
 	mux.HandleFunc("GET /login", handleLoginPage)
 	mux.HandleFunc("POST /login", handleLogin)
 	mux.HandleFunc("POST /logout", authWeb(handleLogout))
-	mux.HandleFunc("POST /star", authWeb(handleQuickStar))
-	mux.HandleFunc("POST /redeem", authWeb(handleRedeem))
+	mux.HandleFunc("GET /password", authWeb(handlePasswordPage))
+	mux.HandleFunc("POST /password", authWeb(handlePasswordChange))
+	mux.HandleFunc("POST /star", authAdmin(handleQuickStar))
+	mux.HandleFunc("POST /redeem", authAdmin(handleRedeem))
+	mux.HandleFunc("DELETE /star/{id}", authAdmin(handleDeleteStar))
 	mux.HandleFunc("GET /admin", authAdmin(handleAdmin))
 	mux.HandleFunc("POST /admin/star", authAdmin(handleAddStar))
 	mux.HandleFunc("POST /admin/apikey", authAdmin(handleGenerateAPIKey))
 	mux.HandleFunc("DELETE /admin/apikey/{id}", authAdmin(handleDeleteAPIKey))
+	mux.HandleFunc("POST /admin/reward", authAdmin(handleAddReward))
+	mux.HandleFunc("POST /admin/reward/{id}", authAdmin(handleUpdateReward))
+	mux.HandleFunc("DELETE /admin/reward/{id}", authAdmin(handleDeleteReward))
 
 	// API routes
 	mux.HandleFunc("GET /api/stars", authAPI(handleAPIGetStars))

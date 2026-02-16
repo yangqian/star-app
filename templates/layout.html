@@ -12,6 +12,7 @@
         {{if .User}}
         <div class="nav-right">
             <span>{{.User.Username}}</span>
+            <a href="/password">Password</a>
             {{if .User.IsAdmin}}<a href="/admin">Admin</a>{{end}}
             <form method="POST" action="/logout" style="display:inline">
                 <button type="submit" class="btn-link">Logout</button>
