@@ -41,6 +41,13 @@ func initDB(dbPath string) error {
 		password_hash TEXT NOT NULL,
 		is_admin BOOLEAN DEFAULT FALSE
 	);
+	CREATE TABLE IF NOT EXISTS user_translations (
+		id INTEGER PRIMARY KEY,
+		user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		lang TEXT NOT NULL,
+		text TEXT NOT NULL,
+		UNIQUE(user_id, lang)
+	);
 	CREATE TABLE IF NOT EXISTS reasons (
 		id INTEGER PRIMARY KEY,
 		key TEXT UNIQUE NOT NULL,
@@ -117,6 +124,18 @@ func runMigrations() error {
 		if err != nil {
 			return fmt.Errorf("failed to add stars column: %w", err)
 		}
+	}
+
+	// Create user_translations table if it doesn't exist
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS user_translations (
+		id INTEGER PRIMARY KEY,
+		user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		lang TEXT NOT NULL,
+		text TEXT NOT NULL,
+		UNIQUE(user_id, lang)
+	)`)
+	if err != nil {
+		return fmt.Errorf("failed to create user_translations table: %w", err)
 	}
 
 	// Migrate rewards table to use key + translations
@@ -261,14 +280,54 @@ func getAllUsers() ([]User, error) {
 	var users []User
 	for rows.Next() {
 		var u User
+		u.Translations = make(map[string]string)
 		rows.Scan(&u.ID, &u.Username, &u.PasswordHash, &u.IsAdmin)
+
+		// Load all translations for this user
+		tRows, _ := db.Query("SELECT lang, text FROM user_translations WHERE user_id = ?", u.ID)
+		for tRows.Next() {
+			var lang, text string
+			tRows.Scan(&lang, &text)
+			u.Translations[lang] = text
+		}
+		tRows.Close()
+
 		users = append(users, u)
 	}
 	return users, nil
 }
 
+func updateUserTranslation(userID int, lang, text string) error {
+	_, err := db.Exec(`
+		INSERT INTO user_translations (user_id, lang, text) VALUES (?, ?, ?)
+		ON CONFLICT(user_id, lang) DO UPDATE SET text = ?
+	`, userID, lang, text, text)
+	return err
+}
+
+func getUserText(userID int, lang string) string {
+	var text string
+	// Try to get translation in requested language
+	err := db.QueryRow("SELECT text FROM user_translations WHERE user_id = ? AND lang = ?", userID, lang).Scan(&text)
+	if err == nil && text != "" {
+		return text
+	}
+	// Fallback to English
+	err = db.QueryRow("SELECT text FROM user_translations WHERE user_id = ? AND lang = 'en'", userID).Scan(&text)
+	if err == nil && text != "" {
+		return text
+	}
+	// Fallback to username
+	var username string
+	db.QueryRow("SELECT username FROM users WHERE id = ?", userID).Scan(&username)
+	return username
+}
+
 type UserStarCount struct {
 	Username     string
+	DisplayNameEN string
+	DisplayNameCN string
+	DisplayNameTW string
 	StarCount    int
 	CurrentStars int
 	IsAdmin      bool
@@ -276,7 +335,7 @@ type UserStarCount struct {
 
 func getUserStarCounts() ([]UserStarCount, error) {
 	rows, err := db.Query(`
-		SELECT u.username, u.is_admin, COALESCE(SUM(s.stars), 0) as star_count,
+		SELECT u.id, u.username, u.is_admin, COALESCE(SUM(s.stars), 0) as star_count,
 			COALESCE(SUM(s.stars), 0) - COALESCE((SELECT SUM(rw.cost) FROM redemptions rd JOIN rewards rw ON rd.reward_id = rw.id WHERE rd.user_id = u.id), 0) as current_stars
 		FROM users u LEFT JOIN stars s ON u.id = s.user_id
 		GROUP BY u.id ORDER BY star_count DESC`)
@@ -288,7 +347,14 @@ func getUserStarCounts() ([]UserStarCount, error) {
 	var results []UserStarCount
 	for rows.Next() {
 		var r UserStarCount
-		rows.Scan(&r.Username, &r.IsAdmin, &r.StarCount, &r.CurrentStars)
+		var userID int
+		rows.Scan(&userID, &r.Username, &r.IsAdmin, &r.StarCount, &r.CurrentStars)
+
+		// Get all translations for this user
+		r.DisplayNameEN = getUserText(userID, "en")
+		r.DisplayNameCN = getUserText(userID, "zh-CN")
+		r.DisplayNameTW = getUserText(userID, "zh-TW")
+
 		results = append(results, r)
 	}
 	return results, nil

@@ -285,6 +285,25 @@ func handleDeleteReason(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, map[string]string{"status": "ok"})
 }
 
+func handleUpdateUserTranslation(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	lang := r.FormValue("lang")
+	text := r.FormValue("text")
+
+	if lang == "" || text == "" {
+		http.Error(w, "lang and text required", http.StatusBadRequest)
+		return
+	}
+
+	updateUserTranslation(id, lang, text)
+	jsonResponse(w, map[string]string{"status": "ok"})
+}
+
 func handleDeleteStar(w http.ResponseWriter, r *http.Request) {
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)

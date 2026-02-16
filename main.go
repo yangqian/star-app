@@ -68,6 +68,7 @@ func main() {
 	mux.HandleFunc("POST /admin/toggle-announce", authAdmin(handleToggleAnnounce))
 	mux.HandleFunc("PUT /admin/reason/{id}", authAdmin(handleUpdateReasonTranslation))
 	mux.HandleFunc("DELETE /admin/reason/{id}", authAdmin(handleDeleteReason))
+	mux.HandleFunc("PUT /admin/user/{id}", authAdmin(handleUpdateUserTranslation))
 
 	// API routes
 	mux.HandleFunc("GET /api/stars", authAPI(handleAPIGetStars))

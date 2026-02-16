@@ -7,6 +7,7 @@ type User struct {
 	Username     string
 	PasswordHash string
 	IsAdmin      bool
+	Translations map[string]string
 }
 
 type Star struct {

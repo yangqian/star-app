@@ -263,6 +263,11 @@ function applyLang() {
         var text = el.getAttribute('data-' + langKey) || el.getAttribute('data-en');
         if (text) el.textContent = text;
     });
+    // Update user names
+    document.querySelectorAll('.user-name').forEach(function(el) {
+        var text = el.getAttribute('data-' + langKey) || el.getAttribute('data-en');
+        if (text) el.textContent = text;
+    });
     // Update star history reasons
     document.querySelectorAll('.star-reason').forEach(function(el) {
         var text = el.getAttribute('data-' + langKey) || el.getAttribute('data-en');

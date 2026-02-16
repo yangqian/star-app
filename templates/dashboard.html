@@ -27,7 +27,7 @@
 <div class="star-counts">
     {{range .StarCounts}}
     <div class="member-card" data-username="{{.Username}}" data-role="{{if .IsAdmin}}parent{{else}}kid{{end}}" data-self="{{if eq .Username $.User.Username}}true{{else}}false{{end}}" onclick="selectUser('{{.Username}}')" title="Click to select">
-        <h2>{{.Username}}</h2>
+        <h2 class="user-name" data-en="{{.DisplayNameEN}}" data-zh-cn="{{.DisplayNameCN}}" data-zh-tw="{{.DisplayNameTW}}">{{.DisplayNameEN}}</h2>
         <div class="star-number">{{.CurrentStars}}</div>
         <div class="star-label" data-i18n="current_stars">current stars</div>
         <div class="star-total">{{.StarCount}} <span data-i18n="total_earned">total earned</span></div>

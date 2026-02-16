@@ -138,6 +138,32 @@
 </section>
 
 <section>
+    <h2>User Translations <span style="font-size:0.8rem;font-weight:normal;">(Click to edit)</span></h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Username</th>
+                <th>English</th>
+                <th>简体中文</th>
+                <th>繁體中文</th>
+                <th>Role</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .Users}}
+            <tr>
+                <td><strong>{{.Username}}</strong></td>
+                <td class="editable-trans" onclick="editUserTrans({{.ID}}, 'en', this)">{{index .Translations "en"}}</td>
+                <td class="editable-trans" onclick="editUserTrans({{.ID}}, 'zh-CN', this)">{{index .Translations "zh-CN"}}</td>
+                <td class="editable-trans" onclick="editUserTrans({{.ID}}, 'zh-TW', this)">{{index .Translations "zh-TW"}}</td>
+                <td>{{if .IsAdmin}}<span data-i18n="parents">Parents</span>{{else}}<span data-i18n="kids">Kids</span>{{end}}</td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+</section>
+
+<section>
     <h2>Reason Translations <span style="font-size:0.8rem;font-weight:normal;">(Click to edit)</span></h2>
     <table>
         <thead>
