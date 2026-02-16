@@ -1,33 +1,33 @@
 {{define "content"}}
-<h1>Admin Panel</h1>
+<h1 data-i18n="admin_panel">Admin Panel</h1>
 
 <section>
-    <h2>Award a Star</h2>
+    <h2 data-i18n="award_a_star">Award a Star</h2>
     <form method="POST" action="/admin/star">
-        <label>Family Member</label>
+        <label data-i18n="family_member">Family Member</label>
         <select name="username" required>
-            <option value="">Select...</option>
+            <option value="" data-i18n="select">Select...</option>
             {{range .Users}}
             <option value="{{.Username}}">{{.Username}}</option>
             {{end}}
         </select>
 
-        <label>Reason</label>
-        <input type="text" name="reason" id="reason-input" list="reason-list" placeholder="What did they do?" required>
+        <label data-i18n="reason">Reason</label>
+        <input type="text" name="reason" id="reason-input" list="reason-list" data-i18n-placeholder="what_did_they_do" placeholder="What did they do?" required>
         <datalist id="reason-list">
             {{range .Reasons}}
             <option value="{{.Text}}">
             {{end}}
         </datalist>
 
-        <button type="submit">Award Star</button>
+        <button type="submit" data-i18n="award_star">Award Star</button>
     </form>
 </section>
 
 <section>
-    <h2>Rewards</h2>
+    <h2 data-i18n="rewards">Rewards</h2>
     <table>
-        <thead><tr><th>Icon</th><th>Name</th><th>Stars</th><th>Actions</th></tr></thead>
+        <thead><tr><th data-i18n="icon">Icon</th><th data-i18n="name">Name</th><th data-i18n="stars">Stars</th><th data-i18n="actions">Actions</th></tr></thead>
         <tbody>
             {{range .Rewards}}
             <tr>
@@ -36,29 +36,29 @@
                     <td><input type="text" name="name" value="{{.Name}}" required></td>
                     <td><input type="number" name="cost" value="{{.Cost}}" min="1" required style="width:5rem"></td>
                     <td>
-                        <button type="submit">Save</button>
-                        <button type="button" class="btn-danger" onclick="deleteReward({{.ID}})">Delete</button>
+                        <button type="submit" data-i18n="save">Save</button>
+                        <button type="button" class="btn-danger" onclick="deleteReward({{.ID}})" data-i18n="delete">Delete</button>
                     </td>
                 </form>
             </tr>
             {{else}}
-            <tr><td colspan="4">No rewards configured</td></tr>
+            <tr><td colspan="4" data-i18n="no_rewards">No rewards configured</td></tr>
             {{end}}
         </tbody>
     </table>
-    <h3>Add Reward</h3>
+    <h3 data-i18n="add_reward">Add Reward</h3>
     <form method="POST" action="/admin/reward">
         <div style="display:flex;gap:0.5rem;align-items:end;">
-            <div><label>Icon</label><input type="text" name="icon" placeholder="🎁" style="width:3rem;text-align:center"></div>
-            <div style="flex:1"><label>Name</label><input type="text" name="name" placeholder="Reward name" required></div>
-            <div><label>Stars</label><input type="number" name="cost" placeholder="5" min="1" required style="width:5rem"></div>
-            <button type="submit" style="margin-bottom:0.5rem">Add</button>
+            <div><label data-i18n="icon">Icon</label><input type="text" name="icon" placeholder="🎁" style="width:3rem;text-align:center"></div>
+            <div style="flex:1"><label data-i18n="name">Name</label><input type="text" name="name" data-i18n-placeholder="reward_name" placeholder="Reward name" required></div>
+            <div><label data-i18n="stars">Stars</label><input type="number" name="cost" placeholder="5" min="1" required style="width:5rem"></div>
+            <button type="submit" style="margin-bottom:0.5rem" data-i18n="add">Add</button>
         </div>
     </form>
 </section>
 
 <section>
-    <h2>API Keys</h2>
+    <h2 data-i18n="api_keys">API Keys</h2>
     {{if .NewKey}}
     <div class="alert">
         New API key (copy now, shown only once):<br>
@@ -67,26 +67,43 @@
     {{end}}
 
     <form method="POST" action="/admin/apikey">
-        <input type="text" name="label" placeholder="Label (e.g. Home Assistant)" required>
-        <button type="submit">Generate Key</button>
+        <input type="text" name="label" data-i18n-placeholder="label_placeholder" placeholder="Label (e.g. Home Assistant)" required>
+        <button type="submit" data-i18n="generate_key">Generate Key</button>
     </form>
 
     <table>
-        <thead><tr><th>Label</th><th>Created</th><th>Action</th></tr></thead>
+        <thead><tr><th data-i18n="label">Label</th><th data-i18n="created">Created</th><th data-i18n="action">Action</th></tr></thead>
         <tbody>
             {{range .APIKeys}}
             <tr>
                 <td>{{.Label}}</td>
                 <td>{{.CreatedAt.Format "Jan 2, 2006"}}</td>
                 <td>
-                    <button class="btn-danger" onclick="deleteKey({{.ID}})">Revoke</button>
+                    <button class="btn-danger" onclick="deleteKey({{.ID}})" data-i18n="revoke">Revoke</button>
                 </td>
             </tr>
             {{else}}
-            <tr><td colspan="3">No API keys</td></tr>
+            <tr><td colspan="3" data-i18n="no_api_keys">No API keys</td></tr>
             {{end}}
         </tbody>
     </table>
+</section>
+
+<section>
+    <h2 data-i18n="ha_announce">Home Assistant Announce</h2>
+    <form method="POST" action="/admin/settings">
+        <label class="toggle-label">
+            <input type="checkbox" name="ha_enabled" value="1" {{if eq .HAEnabled "1"}}checked{{end}}>
+            <span data-i18n="ha_enabled_label">Enable announcements</span>
+        </label>
+        <label data-i18n="ha_url_label">Home Assistant URL</label>
+        <input type="text" name="ha_url" value="{{.HAUrl}}" placeholder="https://home.xxx.xxx">
+        <label data-i18n="ha_token_label">Long-Lived Access Token</label>
+        <input type="password" name="ha_token" value="{{.HAToken}}" placeholder="eyJ...">
+        <label data-i18n="ha_media_player_label">Media Player Entity</label>
+        <input type="text" name="ha_media_player" value="{{.HAMediaPlayer}}" placeholder="media_player.home_2">
+        <button type="submit" data-i18n="save">Save</button>
+    </form>
 </section>
 {{end}}
 {{template "layout" .}}

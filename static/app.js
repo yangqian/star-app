@@ -1,4 +1,17 @@
 var selectedUsers = [];
+var selectionMode = 'individual'; // 'individual' or 'multiple'
+
+function setSelectionMode(mode) {
+    selectionMode = mode;
+    document.querySelectorAll('.mode-btn').forEach(function(b) {
+        b.classList.toggle('active', b.dataset.mode === mode);
+    });
+    // When switching to individual and multiple are selected, keep only the first
+    if (mode === 'individual' && selectedUsers.length > 1) {
+        selectedUsers = [selectedUsers[0]];
+        updateSelection();
+    }
+}
 
 function getSelectedNonSelf() {
     return selectedUsers.filter(function(u) {
@@ -60,14 +73,26 @@ function arrEq(a, b) {
 }
 
 function selectUser(username) {
-    // Toggle individual selection
-    var idx = selectedUsers.indexOf(username);
-    if (idx !== -1) selectedUsers.splice(idx, 1);
-    else selectedUsers.push(username);
+    if (selectionMode === 'individual') {
+        // Click switches to this user (or deselects if already the only one)
+        if (selectedUsers.length === 1 && selectedUsers[0] === username) {
+            selectedUsers = [];
+        } else {
+            selectedUsers = [username];
+        }
+    } else {
+        // Multiple: toggle add/remove
+        var idx = selectedUsers.indexOf(username);
+        if (idx !== -1) selectedUsers.splice(idx, 1);
+        else selectedUsers.push(username);
+    }
     updateSelection();
 }
 
 function filterCards(filter) {
+    // Group filters switch to multiple mode; name filters stay individual
+    var isGroup = (filter === 'all' || filter === 'kids' || filter === 'parents');
+    if (isGroup) setSelectionMode('multiple');
     selectedUsers = [];
     document.querySelectorAll('.member-card').forEach(function(c) {
         if (filter === 'all') selectedUsers.push(c.dataset.username);
@@ -113,8 +138,10 @@ function playStarAnim(username, emoji) {
 function submitStar(reason) {
     var targets = getSelectedNonSelf();
     if (!reason || targets.length === 0) return;
-    var pending = targets.length;
-    targets.forEach(function(username) {
+
+    function awardNext(i) {
+        if (i >= targets.length) return;
+        var username = targets[i];
         var body = new URLSearchParams({username: username, reason: reason});
         fetch("/star", {
             method: "POST",
@@ -139,8 +166,10 @@ function submitStar(reason) {
             tr.innerHTML = '<td>' + username + '</td><td>' + reason + '</td><td>' + data.awardedBy + '</td><td>' + time + '</td>';
             tbody.insertBefore(tr, tbody.firstChild);
             playStarAnim(username, '⭐');
+            awardNext(i + 1);
         });
-    });
+    }
+    awardNext(0);
     var ci = document.getElementById('customReason');
     if (ci) ci.value = '';
 }
@@ -150,7 +179,10 @@ function submitRedeem(rewardId, rewardName, cost) {
     if (targets.length === 0) return;
     var names = targets.join(', ');
     if (!confirm("Spend " + cost + " stars each for " + names + " on \"" + rewardName + "\"?")) return;
-    targets.forEach(function(username) {
+
+    function redeemNext(i) {
+        if (i >= targets.length) return;
+        var username = targets[i];
         var body = new URLSearchParams({reward_id: rewardId, username: username});
         fetch("/redeem", {
             method: "POST",
@@ -175,8 +207,10 @@ function submitRedeem(rewardId, rewardName, cost) {
             tr.innerHTML = '<td>' + username + '</td><td>' + data.rewardName + '</td><td>' + data.cost + ' ⭐</td><td>' + time + '</td>';
             tbody.insertBefore(tr, tbody.firstChild);
             playStarAnim(username, '🎁');
+            redeemNext(i + 1);
         });
-    });
+    }
+    redeemNext(0);
 }
 
 function undoStar(id) {
@@ -200,4 +234,18 @@ function deleteKey(id) {
     if (!confirm("Revoke this API key?")) return;
     fetch("/admin/apikey/" + id, { method: "DELETE" })
         .then(function() { location.reload(); });
+}
+
+function toggleAnnounce() {
+    fetch("/admin/toggle-announce", { method: "POST" })
+    .then(function(resp) { return resp.json(); })
+    .then(function(data) {
+        var btn = document.getElementById('announceToggle');
+        var on = data.ha_enabled === '1';
+        btn.classList.toggle('on', on);
+        var span = btn.querySelector('span');
+        var dict = translations[currentLang] || translations.en;
+        span.textContent = on ? (dict.announce_on || 'On') : (dict.announce_off || 'Off');
+        span.setAttribute('data-i18n', on ? 'announce_on' : 'announce_off');
+    });
 }

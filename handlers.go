@@ -63,6 +63,7 @@ func handleDashboard(w http.ResponseWriter, r *http.Request) {
 		"Rewards":     rewards,
 		"Redemptions": redemptions,
 		"Reasons":     reasons,
+		"HAEnabled":   getSetting("ha_enabled"),
 	}
 	templates["dashboard.html"].ExecuteTemplate(w, "dashboard.html", data)
 }
@@ -129,6 +130,7 @@ func handleQuickStar(w http.ResponseWriter, r *http.Request) {
 	}
 
 	addStar(username, reason, user.ID)
+	announceStarIfEnabled(username, reason)
 
 	if r.Header.Get("Accept") == "application/json" {
 		counts, _ := getUserStarCounts()
@@ -246,11 +248,15 @@ func handleAdmin(w http.ResponseWriter, r *http.Request) {
 	rewards, _ := getRewardsList()
 
 	data := map[string]interface{}{
-		"User":    user,
-		"Users":   users,
-		"Reasons": reasons,
-		"APIKeys": apiKeys,
-		"Rewards": rewards,
+		"User":          user,
+		"Users":         users,
+		"Reasons":       reasons,
+		"APIKeys":       apiKeys,
+		"Rewards":       rewards,
+		"HAEnabled":     getSetting("ha_enabled"),
+		"HAUrl":         getSetting("ha_url"),
+		"HAToken":       getSetting("ha_token"),
+		"HAMediaPlayer": getSetting("ha_media_player"),
 	}
 	templates["admin.html"].ExecuteTemplate(w, "admin.html", data)
 }
@@ -308,6 +314,7 @@ func handleAddStar(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	announceStarIfEnabled(username, reason)
 
 	http.Redirect(w, r, "/admin", http.StatusSeeOther)
 }
@@ -349,6 +356,28 @@ func handleDeleteAPIKey(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/admin", http.StatusSeeOther)
 }
 
+func handleSaveSettings(w http.ResponseWriter, r *http.Request) {
+	if r.FormValue("ha_enabled") == "1" {
+		setSetting("ha_enabled", "1")
+	} else {
+		setSetting("ha_enabled", "0")
+	}
+	setSetting("ha_url", r.FormValue("ha_url"))
+	setSetting("ha_token", r.FormValue("ha_token"))
+	setSetting("ha_media_player", r.FormValue("ha_media_player"))
+	http.Redirect(w, r, "/admin", http.StatusSeeOther)
+}
+
+func handleToggleAnnounce(w http.ResponseWriter, r *http.Request) {
+	current := getSetting("ha_enabled")
+	if current == "1" {
+		setSetting("ha_enabled", "0")
+	} else {
+		setSetting("ha_enabled", "1")
+	}
+	jsonResponse(w, map[string]string{"ha_enabled": getSetting("ha_enabled")})
+}
+
 // API handlers
 
 func handleAPIGetStars(w http.ResponseWriter, r *http.Request) {
@@ -382,6 +411,7 @@ func handleAPIAddStar(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	announceStarIfEnabled(req.Username, req.Reason)
 	jsonResponse(w, map[string]string{"status": "ok"})
 }
 

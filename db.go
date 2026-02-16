@@ -63,6 +63,10 @@ func initDB(dbPath string) error {
 		user_id INTEGER NOT NULL REFERENCES users(id),
 		reward_id INTEGER NOT NULL REFERENCES rewards(id),
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE TABLE IF NOT EXISTS settings (
+		key TEXT PRIMARY KEY,
+		value TEXT NOT NULL DEFAULT ''
 	);`
 
 	_, err = db.Exec(schema)
@@ -372,6 +376,18 @@ func getUserCurrentStars(userID int) (int, error) {
 
 func redeemReward(userID, rewardID int) error {
 	_, err := db.Exec("INSERT INTO redemptions (user_id, reward_id) VALUES (?, ?)", userID, rewardID)
+	return err
+}
+
+func getSetting(key string) string {
+	var val string
+	db.QueryRow("SELECT value FROM settings WHERE key = ?", key).Scan(&val)
+	return val
+}
+
+func setSetting(key, value string) error {
+	_, err := db.Exec(`INSERT INTO settings (key, value) VALUES (?, ?)
+		ON CONFLICT(key) DO UPDATE SET value = ?`, key, value, value)
 	return err
 }
 

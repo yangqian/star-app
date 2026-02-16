@@ -1,14 +1,27 @@
 {{define "content"}}
-<h1>Family Star Board</h1>
+<div class="dashboard-header">
+    <h1 data-i18n="star_board">Family Star Board</h1>
+    {{if .User.IsAdmin}}
+    <button class="announce-toggle {{if eq .HAEnabled "1"}}on{{end}}" id="announceToggle" onclick="toggleAnnounce()" title="Toggle announcements">
+        🔊 <span data-i18n="{{if eq .HAEnabled "1"}}announce_on{{else}}announce_off{{end}}">{{if eq .HAEnabled "1"}}On{{else}}Off{{end}}</span>
+    </button>
+    {{end}}
+</div>
 
+<div class="selection-bar">
+<div class="mode-selector">
+    <button class="mode-btn active" data-mode="individual" onclick="setSelectionMode('individual')" data-i18n="mode_individual">Single</button>
+    <button class="mode-btn" data-mode="multiple" onclick="setSelectionMode('multiple')" data-i18n="mode_multiple">Multi</button>
+</div>
 <div class="filter-selector">
-    <button class="filter-btn active" onclick="filterCards('all')">All</button>
-    <button class="filter-btn" onclick="filterCards('kids')">Kids</button>
-    <button class="filter-btn" onclick="filterCards('parents')">Parents</button>
+    <button class="filter-btn active" onclick="filterCards('all')" data-i18n="all">All</button>
+    <button class="filter-btn" onclick="filterCards('kids')" data-i18n="kids">Kids</button>
+    <button class="filter-btn" onclick="filterCards('parents')" data-i18n="parents">Parents</button>
     <span class="filter-separator"></span>
     {{range .StarCounts}}
     <button class="filter-btn" onclick="filterCards('{{.Username}}')">{{.Username}}</button>
     {{end}}
+</div>
 </div>
 
 <div class="star-counts">
@@ -16,34 +29,34 @@
     <div class="member-card" data-username="{{.Username}}" data-role="{{if .IsAdmin}}parent{{else}}kid{{end}}" data-self="{{if eq .Username $.User.Username}}true{{else}}false{{end}}" onclick="selectUser('{{.Username}}')" title="Click to select">
         <h2>{{.Username}}</h2>
         <div class="star-number">{{.CurrentStars}}</div>
-        <div class="star-label">current stars</div>
-        <div class="star-total">{{.StarCount}} total earned</div>
+        <div class="star-label" data-i18n="current_stars">current stars</div>
+        <div class="star-total">{{.StarCount}} <span data-i18n="total_earned">total earned</span></div>
     </div>
     {{end}}
 </div>
 
 {{if .User.IsAdmin}}
 <div class="action-bar" id="actionBar" style="display:none;">
-    <span>Selected: <strong id="selectedName"></strong></span>
-    <button onclick="togglePanel('reasonPanel')">Award Star</button>
-    <button onclick="togglePanel('redeemPanel')">Redeem</button>
+    <span><span data-i18n="selected">Selected:</span> <strong id="selectedName"></strong></span>
+    <button onclick="togglePanel('reasonPanel')" data-i18n="award_star">Award Star</button>
+    <button onclick="togglePanel('redeemPanel')" data-i18n="redeem">Redeem</button>
 </div>
 
 <div class="reason-panel" id="reasonPanel" style="display:none;">
-    <h3>Choose a reason</h3>
+    <h3 data-i18n="choose_reason">Choose a reason</h3>
     <div class="reason-list">
         {{range .Reasons}}
         <div class="reason-item" onclick="submitStar('{{.Text}}')">{{.Text}} <span class="reason-count">({{.Count}})</span></div>
         {{end}}
     </div>
     <div class="reason-custom">
-        <input type="text" id="customReason" placeholder="Custom reason...">
-        <button onclick="submitStar(document.getElementById('customReason').value)">Add</button>
+        <input type="text" id="customReason" data-i18n-placeholder="custom_reason" placeholder="Custom reason...">
+        <button onclick="submitStar(document.getElementById('customReason').value)" data-i18n="add">Add</button>
     </div>
 </div>
 
 <div class="reason-panel" id="redeemPanel" style="display:none;">
-    <h3>Choose a reward</h3>
+    <h3 data-i18n="choose_reward">Choose a reward</h3>
     <div class="reason-list">
         {{range .Rewards}}
         <div class="reason-item" onclick="submitRedeem({{.ID}}, '{{.Name}}', {{.Cost}})">{{.Icon}} {{.Name}} <span class="reason-count">({{.Cost}} ⭐)</span></div>
@@ -52,10 +65,10 @@
 </div>
 {{end}}
 
-<h2>Recent Redemptions</h2>
+<h2 data-i18n="recent_redemptions">Recent Redemptions</h2>
 <table>
     <thead>
-        <tr><th>Who</th><th>Reward</th><th>Cost</th><th>When</th></tr>
+        <tr><th data-i18n="who">Who</th><th data-i18n="reward">Reward</th><th data-i18n="cost">Cost</th><th data-i18n="when">When</th></tr>
     </thead>
     <tbody>
         {{range .Redemptions}}
@@ -66,15 +79,15 @@
             <td>{{.CreatedAt.Format "Jan 2 15:04"}}</td>
         </tr>
         {{else}}
-        <tr><td colspan="4">No redemptions yet!</td></tr>
+        <tr><td colspan="4" data-i18n="no_redemptions">No redemptions yet!</td></tr>
         {{end}}
     </tbody>
 </table>
 
-<h2>Recent Stars</h2>
+<h2 data-i18n="recent_stars">Recent Stars</h2>
 <table>
     <thead>
-        <tr><th>Who</th><th>Reason</th><th>Awarded By</th><th>When</th><th></th></tr>
+        <tr><th data-i18n="who">Who</th><th data-i18n="reason">Reason</th><th data-i18n="awarded_by">Awarded By</th><th data-i18n="when">When</th><th></th></tr>
     </thead>
     <tbody>
         {{range .Stars}}
@@ -86,7 +99,7 @@
             {{if $.User.IsAdmin}}<td><button class="btn-undo" onclick="undoStar({{.ID}})" title="Remove this star">✕</button></td>{{else}}<td></td>{{end}}
         </tr>
         {{else}}
-        <tr><td colspan="5">No stars yet!</td></tr>
+        <tr><td colspan="5" data-i18n="no_stars">No stars yet!</td></tr>
         {{end}}
     </tbody>
 </table>

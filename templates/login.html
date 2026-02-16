@@ -3,10 +3,15 @@
     <h1>⭐ Star Tracker</h1>
     {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
     <form method="POST" action="/login">
-        <input type="text" name="username" placeholder="Username" required autofocus>
-        <input type="password" name="password" placeholder="Password" required>
-        <button type="submit">Login</button>
+        <input type="text" name="username" data-i18n-placeholder="username" placeholder="Username" required autofocus>
+        <input type="password" name="password" data-i18n-placeholder="password_placeholder" placeholder="Password" required>
+        <button type="submit" data-i18n="login">Login</button>
     </form>
+    <div class="lang-switch" style="margin-top:1rem;">
+        <a href="#" class="lang-btn" data-lang="en" onclick="setLang('en');return false">EN</a>
+        <a href="#" class="lang-btn" data-lang="zh-CN" onclick="setLang('zh-CN');return false">简</a>
+        <a href="#" class="lang-btn" data-lang="zh-TW" onclick="setLang('zh-TW');return false">繁</a>
+    </div>
 </div>
 {{end}}
 {{template "layout" .}}

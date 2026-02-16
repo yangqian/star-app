@@ -8,19 +8,25 @@
 </head>
 <body>
     <nav>
-        <a href="/" class="logo">⭐ Star Tracker</a>
+        <a href="/" class="logo" data-i18n="star_tracker">⭐ Star Tracker</a>
         {{if .User}}
         <div class="nav-right">
             <span>{{.User.Username}}</span>
-            <a href="/password">Password</a>
-            {{if .User.IsAdmin}}<a href="/admin">Admin</a>{{end}}
+            <a href="/password" data-i18n="password">Password</a>
+            {{if .User.IsAdmin}}<a href="/admin" data-i18n="admin">Admin</a>{{end}}
             <form method="POST" action="/logout" style="display:inline">
-                <button type="submit" class="btn-link">Logout</button>
+                <button type="submit" class="btn-link" data-i18n="logout">Logout</button>
             </form>
+            <span class="lang-switch">
+                <a href="#" class="lang-btn" data-lang="en" onclick="setLang('en');return false">EN</a>
+                <a href="#" class="lang-btn" data-lang="zh-CN" onclick="setLang('zh-CN');return false">简</a>
+                <a href="#" class="lang-btn" data-lang="zh-TW" onclick="setLang('zh-TW');return false">繁</a>
+            </span>
         </div>
         {{end}}
     </nav>
     <main>{{template "content" .}}</main>
+    <script src="/static/i18n.js"></script>
     <script src="/static/app.js"></script>
 </body>
 </html>{{end}}
