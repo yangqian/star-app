@@ -390,6 +390,23 @@ func handleUpdateReward(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/admin", http.StatusSeeOther)
 }
 
+func handleUpdateRewardTranslation(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	lang := r.FormValue("lang")
+	text := r.FormValue("text")
+
+	if lang != "" && text != "" {
+		updateRewardTranslation(id, lang, text)
+	}
+
+	jsonResponse(w, map[string]string{"status": "ok"})
+}
+
 func handleDeleteReward(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {

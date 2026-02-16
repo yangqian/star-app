@@ -62,6 +62,7 @@ func main() {
 	mux.HandleFunc("DELETE /admin/apikey/{id}", authAdmin(handleDeleteAPIKey))
 	mux.HandleFunc("POST /admin/reward", authAdmin(handleAddReward))
 	mux.HandleFunc("POST /admin/reward/{id}", authAdmin(handleUpdateReward))
+	mux.HandleFunc("PUT /admin/reward/{id}", authAdmin(handleUpdateRewardTranslation))
 	mux.HandleFunc("DELETE /admin/reward/{id}", authAdmin(handleDeleteReward))
 	mux.HandleFunc("POST /admin/settings", authAdmin(handleSaveSettings))
 	mux.HandleFunc("POST /admin/toggle-announce", authAdmin(handleToggleAnnounce))

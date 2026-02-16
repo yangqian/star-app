@@ -48,23 +48,32 @@
 
 <section>
     <h2 data-i18n="rewards">Rewards</h2>
+    <h3>Reward Translations <span style="font-size:0.8rem;font-weight:normal;">(Click to edit)</span></h3>
     <table>
-        <thead><tr><th data-i18n="icon">Icon</th><th data-i18n="name">Name</th><th data-i18n="stars">Stars</th><th data-i18n="actions">Actions</th></tr></thead>
+        <thead>
+            <tr>
+                <th data-i18n="icon">Icon</th>
+                <th>English</th>
+                <th>简体中文</th>
+                <th>繁體中文</th>
+                <th data-i18n="stars">Stars</th>
+                <th data-i18n="actions">Actions</th>
+            </tr>
+        </thead>
         <tbody>
             {{range .Rewards}}
             <tr>
-                <form method="POST" action="/admin/reward/{{.ID}}" style="background:none;padding:0;margin:0;box-shadow:none;">
-                    <td><input type="text" name="icon" value="{{.Icon}}" style="width:3rem;text-align:center"></td>
-                    <td><input type="text" name="name" value="{{.Name}}" required></td>
-                    <td><input type="number" name="cost" value="{{.Cost}}" min="1" required style="width:5rem"></td>
-                    <td>
-                        <button type="submit" data-i18n="save">Save</button>
-                        <button type="button" class="btn-danger" onclick="deleteReward({{.ID}})" data-i18n="delete">Delete</button>
-                    </td>
-                </form>
+                <td style="text-align:center;font-size:1.5rem">{{.Icon}}</td>
+                <td class="editable-trans" onclick="editRewardTrans({{.ID}}, 'en', this)">{{index .Translations "en"}}</td>
+                <td class="editable-trans" onclick="editRewardTrans({{.ID}}, 'zh-CN', this)">{{index .Translations "zh-CN"}}</td>
+                <td class="editable-trans" onclick="editRewardTrans({{.ID}}, 'zh-TW', this)">{{index .Translations "zh-TW"}}</td>
+                <td style="text-align:center">{{.Cost}}</td>
+                <td>
+                    <button class="btn-danger" onclick="deleteReward({{.ID}})" data-i18n="delete">Delete</button>
+                </td>
             </tr>
             {{else}}
-            <tr><td colspan="4" data-i18n="no_rewards">No rewards configured</td></tr>
+            <tr><td colspan="6" data-i18n="no_rewards">No rewards configured</td></tr>
             {{end}}
         </tbody>
     </table>

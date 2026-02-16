@@ -62,7 +62,7 @@
     <h3 data-i18n="choose_reward">Choose a reward</h3>
     <div class="reason-list">
         {{range .Rewards}}
-        <div class="reason-item" onclick="submitRedeem({{.ID}}, '{{.Name}}', {{.Cost}})">{{.Icon}} {{.Name}} <span class="reason-count">({{.Cost}} ⭐)</span></div>
+        <div class="reason-item reward-trans" data-reward-id="{{.ID}}" data-en="{{index .Translations "en"}}" data-zh-cn="{{index .Translations "zh-CN"}}" data-zh-tw="{{index .Translations "zh-TW"}}" onclick="submitRedeem({{.ID}}, '{{index .Translations "en"}}', {{.Cost}})">{{.Icon}} <span class="reward-text">{{index .Translations "en"}}</span> <span class="reason-count">({{.Cost}} ⭐)</span></div>
         {{end}}
     </div>
 </div>

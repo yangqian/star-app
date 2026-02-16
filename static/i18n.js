@@ -252,6 +252,12 @@ function applyLang() {
         var textEl = el.querySelector('.reason-text');
         if (textEl && text) textEl.textContent = text;
     });
+    // Update reward translations in reward panel
+    document.querySelectorAll('.reward-trans').forEach(function(el) {
+        var text = el.getAttribute('data-' + langKey) || el.getAttribute('data-en');
+        var textEl = el.querySelector('.reward-text');
+        if (textEl && text) textEl.textContent = text;
+    });
     // Update star history reasons
     document.querySelectorAll('.star-reason').forEach(function(el) {
         var text = el.getAttribute('data-' + langKey) || el.getAttribute('data-en');

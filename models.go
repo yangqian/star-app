@@ -43,10 +43,11 @@ type SessionData struct {
 }
 
 type Reward struct {
-	ID   int
-	Name string
-	Cost int
-	Icon string
+	ID           int
+	Name         string
+	Cost         int
+	Icon         string
+	Translations map[string]string
 }
 
 type Redemption struct {

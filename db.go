@@ -76,9 +76,17 @@ func initDB(dbPath string) error {
 	);
 	CREATE TABLE IF NOT EXISTS rewards (
 		id INTEGER PRIMARY KEY,
-		name TEXT UNIQUE NOT NULL,
+		key TEXT UNIQUE NOT NULL,
 		cost INTEGER NOT NULL,
-		icon TEXT NOT NULL DEFAULT ''
+		icon TEXT NOT NULL DEFAULT '',
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE TABLE IF NOT EXISTS reward_translations (
+		id INTEGER PRIMARY KEY,
+		reward_id INTEGER NOT NULL REFERENCES rewards(id) ON DELETE CASCADE,
+		lang TEXT NOT NULL,
+		text TEXT NOT NULL,
+		UNIQUE(reward_id, lang)
 	);
 	CREATE TABLE IF NOT EXISTS redemptions (
 		id INTEGER PRIMARY KEY,
@@ -110,6 +118,44 @@ func runMigrations() error {
 			return fmt.Errorf("failed to add stars column: %w", err)
 		}
 	}
+
+	// Migrate rewards table to use key + translations
+	var keyExists bool
+	err = db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('rewards') WHERE name='key'").Scan(&keyExists)
+	if err == nil && !keyExists {
+		// Create reward_translations table
+		_, err = db.Exec(`CREATE TABLE IF NOT EXISTS reward_translations (
+			id INTEGER PRIMARY KEY,
+			reward_id INTEGER NOT NULL REFERENCES rewards(id) ON DELETE CASCADE,
+			lang TEXT NOT NULL,
+			text TEXT NOT NULL,
+			UNIQUE(reward_id, lang)
+		)`)
+		if err != nil {
+			return fmt.Errorf("failed to create reward_translations table: %w", err)
+		}
+
+		// Add key column to rewards
+		_, err = db.Exec("ALTER TABLE rewards ADD COLUMN key TEXT")
+		if err != nil {
+			return fmt.Errorf("failed to add key column to rewards: %w", err)
+		}
+
+		// Migrate existing rewards: copy name to key and create English translation
+		rows, err := db.Query("SELECT id, name FROM rewards WHERE key IS NULL")
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var id int
+				var name string
+				rows.Scan(&id, &name)
+				key := sanitizeKey(name)
+				db.Exec("UPDATE rewards SET key = ? WHERE id = ?", key, id)
+				db.Exec("INSERT INTO reward_translations (reward_id, lang, text) VALUES (?, 'en', ?)", id, name)
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -154,23 +200,27 @@ func seedRewards() error {
 	}
 
 	rewards := []struct {
+		key  string
 		name string
 		cost int
 		icon string
 	}{
-		{"Extra screen time", 5, "📱"},
-		{"Choose dinner", 6, "🍽️"},
-		{"Stay up late", 7, "🌙"},
-		{"Ice cream outing", 8, "🍦"},
-		{"Movie time", 10, "🎬"},
-		{"Day trip choice", 15, "🚗"},
+		{"extra_screen_time", "Extra screen time", 5, "📱"},
+		{"choose_dinner", "Choose dinner", 6, "🍽️"},
+		{"stay_up_late", "Stay up late", 7, "🌙"},
+		{"ice_cream_outing", "Ice cream outing", 8, "🍦"},
+		{"movie_time", "Movie time", 10, "🎬"},
+		{"day_trip_choice", "Day trip choice", 15, "🚗"},
 	}
 
 	for _, r := range rewards {
-		_, err := db.Exec("INSERT INTO rewards (name, cost, icon) VALUES (?, ?, ?)", r.name, r.cost, r.icon)
+		result, err := db.Exec("INSERT INTO rewards (key, cost, icon) VALUES (?, ?, ?)", r.key, r.cost, r.icon)
 		if err != nil {
 			return err
 		}
+		id, _ := result.LastInsertId()
+		// Add English translation
+		db.Exec("INSERT INTO reward_translations (reward_id, lang, text) VALUES (?, 'en', ?)", id, r.name)
 	}
 	fmt.Println("Seeded default rewards")
 	return nil
@@ -519,7 +569,7 @@ func deleteSession(token string) error {
 }
 
 func getRewardsList() ([]Reward, error) {
-	rows, err := db.Query("SELECT id, name, cost, icon FROM rewards ORDER BY cost ASC")
+	rows, err := db.Query("SELECT id, cost, icon FROM rewards ORDER BY cost ASC")
 	if err != nil {
 		return nil, err
 	}
@@ -528,20 +578,72 @@ func getRewardsList() ([]Reward, error) {
 	var rewards []Reward
 	for rows.Next() {
 		var r Reward
-		rows.Scan(&r.ID, &r.Name, &r.Cost, &r.Icon)
+		r.Translations = make(map[string]string)
+		rows.Scan(&r.ID, &r.Cost, &r.Icon)
+
+		// Load all translations for this reward
+		tRows, _ := db.Query("SELECT lang, text FROM reward_translations WHERE reward_id = ?", r.ID)
+		for tRows.Next() {
+			var lang, text string
+			tRows.Scan(&lang, &text)
+			r.Translations[lang] = text
+			if lang == "en" {
+				r.Name = text // Keep Name field for backward compatibility
+			}
+		}
+		tRows.Close()
+
 		rewards = append(rewards, r)
 	}
 	return rewards, nil
 }
 
 func addReward(name string, cost int, icon string) error {
-	_, err := db.Exec("INSERT INTO rewards (name, cost, icon) VALUES (?, ?, ?)", name, cost, icon)
+	key := sanitizeKey(name)
+	result, err := db.Exec("INSERT INTO rewards (key, cost, icon) VALUES (?, ?, ?)", key, cost, icon)
+	if err != nil {
+		return err
+	}
+	id, _ := result.LastInsertId()
+	// Add English translation
+	_, err = db.Exec("INSERT INTO reward_translations (reward_id, lang, text) VALUES (?, 'en', ?)", id, name)
 	return err
 }
 
 func updateReward(id int, name string, cost int, icon string) error {
-	_, err := db.Exec("UPDATE rewards SET name = ?, cost = ?, icon = ? WHERE id = ?", name, cost, icon, id)
+	_, err := db.Exec("UPDATE rewards SET cost = ?, icon = ? WHERE id = ?", cost, icon, id)
+	if err != nil {
+		return err
+	}
+	// Update English translation
+	_, err = db.Exec(`
+		INSERT INTO reward_translations (reward_id, lang, text) VALUES (?, 'en', ?)
+		ON CONFLICT(reward_id, lang) DO UPDATE SET text = ?
+	`, id, name, name)
 	return err
+}
+
+func updateRewardTranslation(rewardID int, lang, text string) error {
+	_, err := db.Exec(`
+		INSERT INTO reward_translations (reward_id, lang, text) VALUES (?, ?, ?)
+		ON CONFLICT(reward_id, lang) DO UPDATE SET text = ?
+	`, rewardID, lang, text, text)
+	return err
+}
+
+func getRewardText(rewardID int, lang string) string {
+	var text string
+	// Try to get translation in requested language
+	err := db.QueryRow("SELECT text FROM reward_translations WHERE reward_id = ? AND lang = ?", rewardID, lang).Scan(&text)
+	if err == nil && text != "" {
+		return text
+	}
+	// Fallback to English
+	err = db.QueryRow("SELECT text FROM reward_translations WHERE reward_id = ? AND lang = 'en'", rewardID).Scan(&text)
+	if err == nil && text != "" {
+		return text
+	}
+	return ""
 }
 
 func deleteRewardByID(id int) error {
@@ -551,11 +653,25 @@ func deleteRewardByID(id int) error {
 
 func getRewardByID(id int) (*Reward, error) {
 	r := &Reward{}
-	err := db.QueryRow("SELECT id, name, cost, icon FROM rewards WHERE id = ?", id).
-		Scan(&r.ID, &r.Name, &r.Cost, &r.Icon)
+	r.Translations = make(map[string]string)
+	err := db.QueryRow("SELECT id, cost, icon FROM rewards WHERE id = ?", id).
+		Scan(&r.ID, &r.Cost, &r.Icon)
 	if err != nil {
 		return nil, err
 	}
+
+	// Load all translations
+	rows, _ := db.Query("SELECT lang, text FROM reward_translations WHERE reward_id = ?", id)
+	defer rows.Close()
+	for rows.Next() {
+		var lang, text string
+		rows.Scan(&lang, &text)
+		r.Translations[lang] = text
+		if lang == "en" {
+			r.Name = text
+		}
+	}
+
 	return r, nil
 }
 

@@ -353,6 +353,46 @@ function undoStar(id) {
     });
 }
 
+function editRewardTrans(rewardId, lang, cell) {
+    var currentText = cell.textContent;
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentText;
+    input.style.width = '100%';
+
+    function save() {
+        var newText = input.value.trim();
+        if (newText && newText !== currentText) {
+            var body = new URLSearchParams({lang: lang, text: newText});
+            fetch("/admin/reward/" + rewardId, {
+                method: "PUT",
+                body: body
+            })
+            .then(function(resp) { return resp.json(); })
+            .then(function() {
+                cell.textContent = newText;
+            });
+        } else {
+            cell.textContent = currentText;
+        }
+    }
+
+    input.onblur = save;
+    input.onkeydown = function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            save();
+        } else if (e.key === 'Escape') {
+            cell.textContent = currentText;
+        }
+    };
+
+    cell.textContent = '';
+    cell.appendChild(input);
+    input.focus();
+    input.select();
+}
+
 function deleteReward(id) {
     if (!confirm("Delete this reward?")) return;
     fetch("/admin/reward/" + id, { method: "DELETE" })
