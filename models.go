@@ -51,10 +51,13 @@ type Reward struct {
 }
 
 type Redemption struct {
-	ID         int
-	UserID     int
-	Username   string
-	RewardName string
-	Cost       int
-	CreatedAt  time.Time
+	ID                 int
+	UserID             int
+	Username           string
+	RewardName         string
+	RewardNameEN       string
+	RewardNameCN       string
+	RewardNameTW       string
+	Cost               int
+	CreatedAt          time.Time
 }

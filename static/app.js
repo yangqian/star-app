@@ -393,6 +393,48 @@ function editRewardTrans(rewardId, lang, cell) {
     input.select();
 }
 
+function editRewardCost(rewardId, cell) {
+    var currentValue = cell.textContent;
+    var input = document.createElement('input');
+    input.type = 'number';
+    input.min = '1';
+    input.value = currentValue;
+    input.style.width = '4rem';
+    input.style.textAlign = 'center';
+
+    function save() {
+        var newValue = parseInt(input.value, 10);
+        if (newValue >= 1 && newValue.toString() !== currentValue) {
+            var body = new URLSearchParams({cost: newValue});
+            fetch("/admin/reward/" + rewardId, {
+                method: "PUT",
+                body: body
+            })
+            .then(function(resp) { return resp.json(); })
+            .then(function() {
+                cell.textContent = newValue;
+            });
+        } else {
+            cell.textContent = currentValue;
+        }
+    }
+
+    input.onblur = save;
+    input.onkeydown = function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            save();
+        } else if (e.key === 'Escape') {
+            cell.textContent = currentValue;
+        }
+    };
+
+    cell.textContent = '';
+    cell.appendChild(input);
+    input.focus();
+    input.select();
+}
+
 function deleteReward(id) {
     if (!confirm("Delete this reward?")) return;
     fetch("/admin/reward/" + id, { method: "DELETE" })

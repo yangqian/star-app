@@ -258,6 +258,11 @@ function applyLang() {
         var textEl = el.querySelector('.reward-text');
         if (textEl && text) textEl.textContent = text;
     });
+    // Update reward names in redemption history
+    document.querySelectorAll('.reward-name').forEach(function(el) {
+        var text = el.getAttribute('data-' + langKey) || el.getAttribute('data-en');
+        if (text) el.textContent = text;
+    });
     // Update star history reasons
     document.querySelectorAll('.star-reason').forEach(function(el) {
         var text = el.getAttribute('data-' + langKey) || el.getAttribute('data-en');

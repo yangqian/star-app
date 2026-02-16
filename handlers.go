@@ -399,9 +399,19 @@ func handleUpdateRewardTranslation(w http.ResponseWriter, r *http.Request) {
 	}
 	lang := r.FormValue("lang")
 	text := r.FormValue("text")
+	costStr := r.FormValue("cost")
 
 	if lang != "" && text != "" {
 		updateRewardTranslation(id, lang, text)
+	}
+
+	if costStr != "" {
+		cost, err := strconv.Atoi(costStr)
+		if err != nil || cost < 1 {
+			http.Error(w, "invalid cost value", http.StatusBadRequest)
+			return
+		}
+		updateRewardCost(id, cost)
 	}
 
 	jsonResponse(w, map[string]string{"status": "ok"})

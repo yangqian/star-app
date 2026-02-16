@@ -631,6 +631,14 @@ func updateRewardTranslation(rewardID int, lang, text string) error {
 	return err
 }
 
+func updateRewardCost(rewardID int, cost int) error {
+	if cost < 1 {
+		cost = 1
+	}
+	_, err := db.Exec("UPDATE rewards SET cost = ? WHERE id = ?", cost, rewardID)
+	return err
+}
+
 func getRewardText(rewardID int, lang string) string {
 	var text string
 	// Try to get translation in requested language
@@ -701,7 +709,7 @@ func setSetting(key, value string) error {
 }
 
 func getRecentRedemptions(limit int, filterUserID int) ([]Redemption, error) {
-	query := `SELECT rd.id, rd.user_id, u.username, rw.name, rw.cost, rd.created_at
+	query := `SELECT rd.id, rd.user_id, u.username, rd.reward_id, rw.cost, rd.created_at
 		FROM redemptions rd
 		JOIN users u ON rd.user_id = u.id
 		JOIN rewards rw ON rd.reward_id = rw.id`
@@ -721,12 +729,20 @@ func getRecentRedemptions(limit int, filterUserID int) ([]Redemption, error) {
 	var results []Redemption
 	for rows.Next() {
 		var r Redemption
+		var rewardID int
 		var createdAtStr sql.NullString
-		err := rows.Scan(&r.ID, &r.UserID, &r.Username, &r.RewardName, &r.Cost, &createdAtStr)
+		err := rows.Scan(&r.ID, &r.UserID, &r.Username, &rewardID, &r.Cost, &createdAtStr)
 		if err != nil {
 			fmt.Printf("Error scanning redemption row: %v\n", err)
 			continue
 		}
+
+		// Get all translations for this reward
+		r.RewardNameEN = getRewardText(rewardID, "en")
+		r.RewardNameCN = getRewardText(rewardID, "zh-CN")
+		r.RewardNameTW = getRewardText(rewardID, "zh-TW")
+		r.RewardName = r.RewardNameEN // Keep for backward compatibility
+
 		// Parse the datetime string - modernc.org/sqlite returns RFC3339 format
 		if createdAtStr.Valid && createdAtStr.String != "" {
 			// Try RFC3339 first (what modernc.org/sqlite returns)

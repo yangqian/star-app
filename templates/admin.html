@@ -67,7 +67,7 @@
                 <td class="editable-trans" onclick="editRewardTrans({{.ID}}, 'en', this)">{{index .Translations "en"}}</td>
                 <td class="editable-trans" onclick="editRewardTrans({{.ID}}, 'zh-CN', this)">{{index .Translations "zh-CN"}}</td>
                 <td class="editable-trans" onclick="editRewardTrans({{.ID}}, 'zh-TW', this)">{{index .Translations "zh-TW"}}</td>
-                <td style="text-align:center">{{.Cost}}</td>
+                <td class="editable-stars" onclick="editRewardCost({{.ID}}, this)" style="text-align:center;cursor:pointer;padding:0.5rem" title="Click to edit">{{.Cost}}</td>
                 <td>
                     <button class="btn-danger" onclick="deleteReward({{.ID}})" data-i18n="delete">Delete</button>
                 </td>
