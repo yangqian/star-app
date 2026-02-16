@@ -148,7 +148,7 @@ function submitStarByReason(reasonId) {
     submitStar(reasonText, reasonId);
 }
 
-function submitStar(reason, reasonId) {
+function submitStar(reason, reasonId, stars) {
     var targets = getSelectedNonSelf();
     if (!reason || targets.length === 0) return;
 
@@ -160,6 +160,9 @@ function submitStar(reason, reasonId) {
             body.append('reason_id', reasonId);
         }
         body.append('reason', reason);
+        if (stars && stars > 0) {
+            body.append('stars', stars);
+        }
 
         fetch("/star", {
             method: "POST",
@@ -208,6 +211,8 @@ function submitStar(reason, reasonId) {
     awardNext(0);
     var ci = document.getElementById('customReason');
     if (ci) ci.value = '';
+    var si = document.getElementById('customStars');
+    if (si) si.value = '1';
 }
 
 function submitRedeem(rewardId, rewardName, cost) {
@@ -280,6 +285,48 @@ function editReasonTrans(reasonId, lang, cell) {
             save();
         } else if (e.key === 'Escape') {
             cell.textContent = currentText;
+        }
+    };
+
+    cell.textContent = '';
+    cell.appendChild(input);
+    input.focus();
+    input.select();
+}
+
+function editReasonStars(reasonId, cell) {
+    var currentValue = cell.textContent;
+    var input = document.createElement('input');
+    input.type = 'number';
+    input.min = '1';
+    input.value = currentValue;
+    input.style.width = '4rem';
+    input.style.textAlign = 'center';
+
+    function save() {
+        var newValue = parseInt(input.value, 10);
+        if (newValue >= 1 && newValue.toString() !== currentValue) {
+            var body = new URLSearchParams({stars: newValue});
+            fetch("/admin/reason/" + reasonId, {
+                method: "PUT",
+                body: body
+            })
+            .then(function(resp) { return resp.json(); })
+            .then(function() {
+                cell.textContent = newValue;
+            });
+        } else {
+            cell.textContent = currentValue;
+        }
+    }
+
+    input.onblur = save;
+    input.onkeydown = function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            save();
+        } else if (e.key === 'Escape') {
+            cell.textContent = currentValue;
         }
     };
 

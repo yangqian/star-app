@@ -92,7 +92,25 @@ func initDB(dbPath string) error {
 	);`
 
 	_, err = db.Exec(schema)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Run migrations
+	return runMigrations()
+}
+
+func runMigrations() error {
+	// Add stars column to reasons table if it doesn't exist
+	var columnExists bool
+	err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('reasons') WHERE name='stars'").Scan(&columnExists)
+	if err == nil && !columnExists {
+		_, err = db.Exec("ALTER TABLE reasons ADD COLUMN stars INTEGER NOT NULL DEFAULT 1")
+		if err != nil {
+			return fmt.Errorf("failed to add stars column: %w", err)
+		}
+	}
+	return nil
 }
 
 func seedUsers() error {
@@ -280,9 +298,6 @@ func addStar(username, reason string, awardedBy int) error {
 }
 
 func addStarWithID(username string, reasonID *int, reasonText string, stars int, awardedBy int) (int64, error) {
-	if stars < 1 {
-		stars = 1
-	}
 	user, err := getUserByUsername(username)
 	if err != nil {
 		return 0, fmt.Errorf("user not found: %s", username)
@@ -290,12 +305,27 @@ func addStarWithID(username string, reasonID *int, reasonText string, stars int,
 
 	// If reason ID provided, use it directly
 	if reasonID != nil && *reasonID > 0 {
+		// Get the star count from the reason if not explicitly provided
+		if stars < 1 {
+			var reasonStars int
+			err := db.QueryRow("SELECT stars FROM reasons WHERE id = ?", reasonID).Scan(&reasonStars)
+			if err == nil && reasonStars > 0 {
+				stars = reasonStars
+			} else {
+				stars = 1
+			}
+		}
 		result, err := db.Exec("INSERT INTO stars (user_id, reason_id, stars, awarded_by) VALUES (?, ?, ?, ?)",
 			user.ID, reasonID, stars, awardedBy)
 		if err != nil {
 			return 0, err
 		}
 		return result.LastInsertId()
+	}
+
+	// Ensure stars is at least 1 for custom reasons
+	if stars < 1 {
+		stars = 1
 	}
 
 	// Otherwise, create a new reason from text
@@ -311,9 +341,9 @@ func addStarWithID(username string, reasonID *int, reasonText string, stars int,
 		// Found existing reason, use it
 		reasonID = existingID
 	} else {
-		// Create new reason
+		// Create new reason with specified star count
 		key := sanitizeKey(reasonText)
-		result, err := db.Exec("INSERT INTO reasons (key) VALUES (?)", key)
+		result, err := db.Exec("INSERT INTO reasons (key, stars) VALUES (?, ?)", key, stars)
 		if err != nil {
 			return 0, err
 		}
@@ -358,6 +388,20 @@ func updateReasonTranslation(reasonID int, lang, text string) error {
 	return err
 }
 
+func updateReasonStars(reasonID int, stars int) error {
+	if stars < 1 {
+		stars = 1
+	}
+	// Update the reason's default star count
+	_, err := db.Exec("UPDATE reasons SET stars = ? WHERE id = ?", stars, reasonID)
+	if err != nil {
+		return err
+	}
+	// Retroactively update all existing stars with this reason
+	_, err = db.Exec("UPDATE stars SET stars = ? WHERE reason_id = ?", stars, reasonID)
+	return err
+}
+
 func deleteReason(reasonID int) error {
 	_, err := db.Exec("DELETE FROM reasons WHERE id = ?", reasonID)
 	return err
@@ -371,10 +415,10 @@ func deleteStar(id int) error {
 func getReasons() ([]Reason, error) {
 	// Get reasons with star count
 	rows, err := db.Query(`
-		SELECT r.id, r.key, COUNT(s.id) as count
+		SELECT r.id, r.key, r.stars, COUNT(s.id) as count
 		FROM reasons r
 		LEFT JOIN stars s ON r.id = s.reason_id
-		GROUP BY r.id, r.key
+		GROUP BY r.id, r.key, r.stars
 		ORDER BY count DESC
 	`)
 	if err != nil {
@@ -386,7 +430,7 @@ func getReasons() ([]Reason, error) {
 	for rows.Next() {
 		var r Reason
 		r.Translations = make(map[string]string)
-		rows.Scan(&r.ID, &r.Key, &r.Count)
+		rows.Scan(&r.ID, &r.Key, &r.Stars, &r.Count)
 
 		// Load all translations for this reason
 		tRows, _ := db.Query("SELECT lang, text FROM reason_translations WHERE reason_id = ?", r.ID)

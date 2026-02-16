@@ -4,7 +4,7 @@
 <section>
     <h2 data-i18n="award_a_star">Award a Star</h2>
     <table>
-        <thead><tr><th data-i18n="who">Who</th><th data-i18n="reason">Reason</th><th data-i18n="count">Count</th><th data-i18n="actions">Actions</th></tr></thead>
+        <thead><tr><th data-i18n="who">Who</th><th data-i18n="reason">Reason</th><th data-i18n="stars">Stars</th><th data-i18n="count">Count</th><th data-i18n="actions">Actions</th></tr></thead>
         <tbody>
             {{range .Reasons}}
             <tr>
@@ -18,12 +18,13 @@
                         </select>
                     </td>
                     <td><input type="text" name="reason" value="{{index .Translations "en"}}" required style="width:100%"></td>
+                    <td style="text-align:center">{{.Stars}}</td>
                     <td style="text-align:center">{{.Count}}</td>
                     <td><button type="submit" data-i18n="award">Award</button></td>
                 </form>
             </tr>
             {{else}}
-            <tr><td colspan="4" data-i18n="no_reasons">No reasons used yet</td></tr>
+            <tr><td colspan="5" data-i18n="no_reasons">No reasons used yet</td></tr>
             {{end}}
             <tr>
                 <form method="POST" action="/admin/star" style="background:none;padding:0;margin:0;box-shadow:none;">
@@ -36,6 +37,7 @@
                         </select>
                     </td>
                     <td><input type="text" name="reason" data-i18n-placeholder="what_did_they_do" placeholder="What did they do?" required style="width:100%"></td>
+                    <td><input type="number" name="stars" min="1" value="1" style="width:4rem;text-align:center"></td>
                     <td></td>
                     <td><button type="submit" data-i18n="award">Award</button></td>
                 </form>
@@ -135,6 +137,7 @@
                 <th>English</th>
                 <th>简体中文</th>
                 <th>繁體中文</th>
+                <th data-i18n="stars">Stars</th>
                 <th data-i18n="count">Count</th>
                 <th data-i18n="actions">Actions</th>
             </tr>
@@ -146,13 +149,14 @@
                 <td class="editable-trans" onclick="editReasonTrans({{.ID}}, 'en', this)">{{index .Translations "en"}}</td>
                 <td class="editable-trans" onclick="editReasonTrans({{.ID}}, 'zh-CN', this)">{{index .Translations "zh-CN"}}</td>
                 <td class="editable-trans" onclick="editReasonTrans({{.ID}}, 'zh-TW', this)">{{index .Translations "zh-TW"}}</td>
+                <td class="editable-stars" onclick="editReasonStars({{.ID}}, this)" style="text-align:center;cursor:pointer;padding:0.5rem" title="Click to edit">{{.Stars}}</td>
                 <td style="text-align:center">{{.Count}}</td>
                 <td>
                     <button class="btn-danger" onclick="deleteReasonEntry({{.ID}})" data-i18n="delete">Delete</button>
                 </td>
             </tr>
             {{else}}
-            <tr><td colspan="6" data-i18n="no_reasons">No reasons used yet</td></tr>
+            <tr><td colspan="7" data-i18n="no_reasons">No reasons used yet</td></tr>
             {{end}}
         </tbody>
     </table>

@@ -256,11 +256,21 @@ func handleUpdateReasonTranslation(w http.ResponseWriter, r *http.Request) {
 	}
 	lang := r.FormValue("lang")
 	text := r.FormValue("text")
-	if lang == "" || text == "" {
-		http.Error(w, "lang and text required", http.StatusBadRequest)
-		return
+	starsStr := r.FormValue("stars")
+
+	if lang != "" && text != "" {
+		updateReasonTranslation(id, lang, text)
 	}
-	updateReasonTranslation(id, lang, text)
+
+	if starsStr != "" {
+		stars, err := strconv.Atoi(starsStr)
+		if err != nil || stars < 1 {
+			http.Error(w, "invalid stars value", http.StatusBadRequest)
+			return
+		}
+		updateReasonStars(id, stars)
+	}
+
 	jsonResponse(w, map[string]string{"status": "ok"})
 }
 
@@ -394,13 +404,22 @@ func handleAddStar(w http.ResponseWriter, r *http.Request) {
 	user := getContextUser(r)
 	username := r.FormValue("username")
 	reason := r.FormValue("reason")
+	starsStr := r.FormValue("stars")
 
 	if username == "" || reason == "" {
 		http.Error(w, "username and reason required", http.StatusBadRequest)
 		return
 	}
 
-	if err := addStar(username, reason, user.ID); err != nil {
+	stars := 1
+	if starsStr != "" {
+		if s, err := strconv.Atoi(starsStr); err == nil && s > 0 {
+			stars = s
+		}
+	}
+
+	_, err := addStarWithID(username, nil, reason, stars, user.ID)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -488,6 +507,7 @@ func handleAPIAddStar(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Username string `json:"username"`
 		Reason   string `json:"reason"`
+		Stars    int    `json:"stars"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		jsonError(w, "invalid JSON", http.StatusBadRequest)
@@ -498,7 +518,13 @@ func handleAPIAddStar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := addStar(req.Username, req.Reason, 0); err != nil {
+	stars := req.Stars
+	if stars < 1 {
+		stars = 1
+	}
+
+	_, err := addStarWithID(req.Username, nil, req.Reason, stars, 0)
+	if err != nil {
 		jsonError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
