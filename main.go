@@ -72,6 +72,8 @@ func main() {
 	mux.HandleFunc("PUT /admin/reason/{id}", authAdmin(handleUpdateReasonTranslation))
 	mux.HandleFunc("DELETE /admin/reason/{id}", authAdmin(handleDeleteReason))
 	mux.HandleFunc("PUT /admin/user/{id}", authAdmin(handleUpdateUserTranslation))
+	mux.HandleFunc("GET /admin/export", authAdmin(handleExport))
+	mux.HandleFunc("POST /admin/import", authAdmin(handleImport))
 
 	// API routes
 	mux.HandleFunc("GET /api/stars", authAPI(handleAPIGetStars))

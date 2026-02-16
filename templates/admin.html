@@ -2,6 +2,20 @@
 <h1 data-i18n="admin_panel">Admin Panel</h1>
 
 <section>
+    <h2 data-i18n="import_export">Import / Export</h2>
+    <div style="display:flex;gap:1rem;align-items:center;">
+        <a href="/admin/export" class="btn-export" style="background:#27ae60;color:white;padding:0.6rem 1.5rem;border-radius:4px;text-decoration:none;display:inline-block;">
+            <span data-i18n="export_data">Export Data</span> ⬇️
+        </a>
+        <form method="POST" action="/admin/import" enctype="multipart/form-data" style="display:flex;gap:0.5rem;align-items:center;background:none;padding:0;margin:0;box-shadow:none;">
+            <input type="file" name="file" accept=".json" required>
+            <button type="submit" data-i18n="import_data">Import Data</button>
+        </form>
+    </div>
+    <p style="color:#888;font-size:0.9rem;margin-top:0.5rem;" data-i18n="import_export_hint">Export creates a JSON backup. Import will replace all existing data.</p>
+</section>
+
+<section>
     <h2 data-i18n="award_a_star">Award a Star</h2>
     <table>
         <thead><tr><th data-i18n="who">Who</th><th data-i18n="reason">Reason</th><th data-i18n="stars">Stars</th><th data-i18n="count">Count</th><th data-i18n="actions">Actions</th></tr></thead>

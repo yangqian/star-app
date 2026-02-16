@@ -626,6 +626,40 @@ func handleToggleAnnounce(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, map[string]string{"ha_enabled": getSetting("ha_enabled")})
 }
 
+func handleExport(w http.ResponseWriter, r *http.Request) {
+	data, err := exportAllData()
+	if err != nil {
+		http.Error(w, "Failed to export data: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Disposition", "attachment; filename=star-app-export.json")
+	json.NewEncoder(w).Encode(data)
+}
+
+func handleImport(w http.ResponseWriter, r *http.Request) {
+	file, _, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "Failed to read file", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	var data map[string]interface{}
+	if err := json.NewDecoder(file).Decode(&data); err != nil {
+		http.Error(w, "Invalid JSON file", http.StatusBadRequest)
+		return
+	}
+
+	if err := importAllData(data); err != nil {
+		http.Error(w, "Failed to import data: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/admin", http.StatusSeeOther)
+}
+
 
 // API handlers
 

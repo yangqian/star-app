@@ -72,7 +72,11 @@ var translations = {
         award: "Award",
         no_reasons: "No reasons used yet",
         award_custom: "Award Custom",
-        account: "Account"
+        account: "Account",
+        import_export: "Import / Export",
+        export_data: "Export Data",
+        import_data: "Import Data",
+        import_export_hint: "Export creates a JSON backup. Import will replace all existing data."
     },
     "zh-CN": {
         star_tracker: "⭐ 星星记录",
@@ -147,7 +151,11 @@ var translations = {
         award: "奖励",
         no_reasons: "暂无使用过的原因",
         award_custom: "自定义奖励",
-        account: "账户"
+        account: "账户",
+        import_export: "导入 / 导出",
+        export_data: "导出数据",
+        import_data: "导入数据",
+        import_export_hint: "导出会创建 JSON 备份。导入将替换所有现有数据。"
     },
     "zh-TW": {
         star_tracker: "⭐ 星星記錄",
@@ -222,7 +230,11 @@ var translations = {
         award: "獎勵",
         no_reasons: "暫無使用過的原因",
         award_custom: "自訂獎勵",
-        account: "帳戶"
+        account: "帳戶",
+        import_export: "匯入 / 匯出",
+        export_data: "匯出資料",
+        import_data: "匯入資料",
+        import_export_hint: "匯出會建立 JSON 備份。匯入將替換所有現有資料。"
     }
 };
 

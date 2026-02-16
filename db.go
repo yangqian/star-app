@@ -826,6 +826,172 @@ func setSetting(key, value string) error {
 	return err
 }
 
+func exportAllData() (map[string]interface{}, error) {
+	data := make(map[string]interface{})
+
+	// Export users (without password hashes for security)
+	users, _ := getAllUsers()
+	var userExport []map[string]interface{}
+	for _, u := range users {
+		userExport = append(userExport, map[string]interface{}{
+			"username":     u.Username,
+			"is_admin":     u.IsAdmin,
+			"translations": u.Translations,
+		})
+	}
+	data["users"] = userExport
+
+	// Export stars
+	stars, _ := getStars("")
+	var starExport []map[string]interface{}
+	for _, s := range stars {
+		starExport = append(starExport, map[string]interface{}{
+			"username":   s.Username,
+			"reason_id":  s.ReasonID,
+			"reason_text": s.ReasonText,
+			"stars":      s.Stars,
+			"awarded_by": s.AwardedByName,
+			"created_at": s.CreatedAt,
+		})
+	}
+	data["stars"] = starExport
+
+	// Export reasons
+	reasons, _ := getReasons()
+	var reasonExport []map[string]interface{}
+	for _, r := range reasons {
+		reasonExport = append(reasonExport, map[string]interface{}{
+			"key":          r.Key,
+			"translations": r.Translations,
+			"stars":        r.Stars,
+		})
+	}
+	data["reasons"] = reasonExport
+
+	// Export rewards
+	rewards, _ := getRewardsList()
+	var rewardExport []map[string]interface{}
+	for _, r := range rewards {
+		rewardExport = append(rewardExport, map[string]interface{}{
+			"key":          r.Name,
+			"cost":         r.Cost,
+			"icon":         r.Icon,
+			"translations": r.Translations,
+		})
+	}
+	data["rewards"] = rewardExport
+
+	// Export redemptions
+	redemptions, _ := getRecentRedemptions(10000, 0)
+	var redemptionExport []map[string]interface{}
+	for _, r := range redemptions {
+		redemptionExport = append(redemptionExport, map[string]interface{}{
+			"username":    r.Username,
+			"reward_name": r.RewardName,
+			"cost":        r.Cost,
+			"created_at":  r.CreatedAt,
+		})
+	}
+	data["redemptions"] = redemptionExport
+
+	// Export settings
+	settings := map[string]string{
+		"ha_enabled":      getSetting("ha_enabled"),
+		"ha_url":          getSetting("ha_url"),
+		"ha_token":        getSetting("ha_token"),
+		"ha_media_player": getSetting("ha_media_player"),
+	}
+	data["settings"] = settings
+
+	return data, nil
+}
+
+func importAllData(data map[string]interface{}) error {
+	// Note: This is a basic implementation. In production, you'd want to:
+	// 1. Validate the data structure
+	// 2. Use transactions
+	// 3. Handle conflicts better
+	// 4. Create backups before importing
+
+	// Clear existing data (except users for security)
+	db.Exec("DELETE FROM redemptions")
+	db.Exec("DELETE FROM stars")
+	db.Exec("DELETE FROM reason_translations")
+	db.Exec("DELETE FROM reasons")
+	db.Exec("DELETE FROM reward_translations")
+	db.Exec("DELETE FROM rewards")
+
+	// Import reasons
+	if reasons, ok := data["reasons"].([]interface{}); ok {
+		for _, item := range reasons {
+			r := item.(map[string]interface{})
+			key := r["key"].(string)
+			stars := int(r["stars"].(float64))
+			result, _ := db.Exec("INSERT INTO reasons (key, stars) VALUES (?, ?)", key, stars)
+			id, _ := result.LastInsertId()
+
+			// Import translations
+			if trans, ok := r["translations"].(map[string]interface{}); ok {
+				for lang, text := range trans {
+					db.Exec("INSERT INTO reason_translations (reason_id, lang, text) VALUES (?, ?, ?)", id, lang, text)
+				}
+			}
+		}
+	}
+
+	// Import rewards
+	if rewards, ok := data["rewards"].([]interface{}); ok {
+		for _, item := range rewards {
+			r := item.(map[string]interface{})
+			key := r["key"].(string)
+			cost := int(r["cost"].(float64))
+			icon := r["icon"].(string)
+			result, _ := db.Exec("INSERT INTO rewards (key, cost, icon) VALUES (?, ?, ?)", key, cost, icon)
+			id, _ := result.LastInsertId()
+
+			// Import translations
+			if trans, ok := r["translations"].(map[string]interface{}); ok {
+				for lang, text := range trans {
+					db.Exec("INSERT INTO reward_translations (reward_id, lang, text) VALUES (?, ?, ?)", id, lang, text)
+				}
+			}
+		}
+	}
+
+	// Import user translations (don't modify user accounts for security)
+	if users, ok := data["users"].([]interface{}); ok {
+		for _, item := range users {
+			u := item.(map[string]interface{})
+			username := u["username"].(string)
+
+			// Get user ID
+			user, err := getUserByUsername(username)
+			if err != nil {
+				continue // Skip if user doesn't exist
+			}
+
+			// Clear existing translations
+			db.Exec("DELETE FROM user_translations WHERE user_id = ?", user.ID)
+
+			// Import translations
+			if trans, ok := u["translations"].(map[string]interface{}); ok {
+				for lang, text := range trans {
+					db.Exec("INSERT INTO user_translations (user_id, lang, text) VALUES (?, ?, ?)", user.ID, lang, text)
+				}
+			}
+		}
+	}
+
+	// Import settings
+	if settings, ok := data["settings"].(map[string]interface{}); ok {
+		for key, value := range settings {
+			setSetting(key, value.(string))
+		}
+	}
+
+	return nil
+}
+
 func getRecentRedemptions(limit int, filterUserID int) ([]Redemption, error) {
 	query := `SELECT rd.id, rd.user_id, u.username, rd.reward_id, rw.cost, rd.created_at
 		FROM redemptions rd
