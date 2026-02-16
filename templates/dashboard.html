@@ -19,7 +19,7 @@
     <button class="filter-btn" onclick="filterCards('parents')" data-i18n="parents">Parents</button>
     <span class="filter-separator"></span>
     {{range .StarCounts}}
-    <button class="filter-btn" onclick="filterCards('{{.Username}}')">{{.Username}}</button>
+    <button class="filter-btn user-name" data-en="{{.DisplayNameEN}}" data-zh-cn="{{.DisplayNameCN}}" data-zh-tw="{{.DisplayNameTW}}" onclick="filterCards('{{.Username}}')">{{.DisplayNameEN}}</button>
     {{end}}
 </div>
 </div>
@@ -71,18 +71,19 @@
 <h2 data-i18n="recent_redemptions">Recent Redemptions</h2>
 <table>
     <thead>
-        <tr><th data-i18n="who">Who</th><th data-i18n="reward">Reward</th><th data-i18n="cost">Cost</th><th data-i18n="when">When</th></tr>
+        <tr><th data-i18n="who">Who</th><th data-i18n="reward">Reward</th><th data-i18n="cost">Cost</th><th data-i18n="when">When</th>{{if .User.IsAdmin}}<th></th>{{end}}</tr>
     </thead>
     <tbody>
         {{range .Redemptions}}
-        <tr data-username="{{.Username}}">
-            <td>{{.Username}}</td>
+        <tr data-redemption-id="{{.ID}}" data-username="{{.Username}}">
+            <td class="user-name" data-en="{{.UsernameEN}}" data-zh-cn="{{.UsernameCN}}" data-zh-tw="{{.UsernameTW}}">{{.UsernameEN}}</td>
             <td class="reward-name" data-en="{{.RewardNameEN}}" data-zh-cn="{{.RewardNameCN}}" data-zh-tw="{{.RewardNameTW}}">{{.RewardName}}</td>
             <td>{{.Cost}} ⭐</td>
-            <td>{{.CreatedAt.Format "Jan 2 15:04"}}</td>
+            <td class="local-time" data-time="{{.CreatedAt.Format "2006-01-02T15:04:05Z07:00"}}">{{.CreatedAt.Format "Jan 2 15:04"}}</td>
+            {{if $.User.IsAdmin}}{{if ne .Username $.User.Username}}<td><button class="btn-undo" onclick="undoRedemption({{.ID}})" title="Remove this redemption">✕</button></td>{{else}}<td></td>{{end}}{{end}}
         </tr>
         {{else}}
-        <tr><td colspan="4" data-i18n="no_redemptions">No redemptions yet!</td></tr>
+        <tr><td colspan="{{if $.User.IsAdmin}}5{{else}}4{{end}}" data-i18n="no_redemptions">No redemptions yet!</td></tr>
         {{end}}
     </tbody>
 </table>
@@ -95,11 +96,11 @@
     <tbody>
         {{range .Stars}}
         <tr data-star-id="{{.ID}}" data-username="{{.Username}}">
-            <td>{{.Username}}</td>
+            <td class="user-name" data-en="{{.UsernameEN}}" data-zh-cn="{{.UsernameCN}}" data-zh-tw="{{.UsernameTW}}">{{.UsernameEN}}</td>
             <td class="star-reason" data-en="{{.ReasonEN}}" data-zh-cn="{{.ReasonCN}}" data-zh-tw="{{.ReasonTW}}">{{.Display}}</td>
-            <td>{{.AwardedByName}}</td>
-            <td>{{.CreatedAt.Format "Jan 2 15:04"}}</td>
-            {{if $.User.IsAdmin}}<td><button class="btn-undo" onclick="undoStar({{.ID}})" title="Remove this star">✕</button></td>{{else}}<td></td>{{end}}
+            <td class="user-name" data-en="{{.AwardedByNameEN}}" data-zh-cn="{{.AwardedByNameCN}}" data-zh-tw="{{.AwardedByNameTW}}">{{.AwardedByNameEN}}</td>
+            <td class="local-time" data-time="{{.CreatedAt.Format "2006-01-02T15:04:05Z07:00"}}">{{.CreatedAt.Format "Jan 2 15:04"}}</td>
+            {{if $.User.IsAdmin}}{{if ne .Username $.User.Username}}<td><button class="btn-undo" onclick="undoStar({{.ID}})" title="Remove this star">✕</button></td>{{else}}<td></td>{{end}}{{else}}<td></td>{{end}}
         </tr>
         {{else}}
         <tr><td colspan="5" data-i18n="no_stars">No stars yet!</td></tr>

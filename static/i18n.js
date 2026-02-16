@@ -268,6 +268,8 @@ function applyLang() {
         var text = el.getAttribute('data-' + langKey) || el.getAttribute('data-en');
         if (text) el.textContent = text;
     });
+    // Update time displays
+    formatLocalTimes();
     // Update star history reasons
     document.querySelectorAll('.star-reason').forEach(function(el) {
         var text = el.getAttribute('data-' + langKey) || el.getAttribute('data-en');
@@ -280,6 +282,25 @@ function applyLang() {
             } else {
                 el.textContent = text;
             }
+        }
+    });
+}
+
+function formatLocalTimes() {
+    var locale = currentLang === 'zh-CN' ? 'zh-CN' : (currentLang === 'zh-TW' ? 'zh-TW' : 'en-US');
+    document.querySelectorAll('.local-time').forEach(function(el) {
+        var timeStr = el.getAttribute('data-time');
+        if (timeStr) {
+            var date = new Date(timeStr);
+            // Format: Month Day HH:MM (e.g., "Jan 2 15:04" or "1月2日 15:04")
+            var options = { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false };
+            var formatted = date.toLocaleString(locale, options);
+            // Clean up formatting differences
+            if (currentLang === 'en') {
+                // For English, keep the format similar to "Jan 2 15:04"
+                formatted = formatted.replace(',', '');
+            }
+            el.textContent = formatted;
         }
     });
 }

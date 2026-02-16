@@ -56,6 +56,7 @@ func main() {
 	mux.HandleFunc("POST /star", authAdmin(handleQuickStar))
 	mux.HandleFunc("POST /redeem", authAdmin(handleRedeem))
 	mux.HandleFunc("DELETE /star/{id}", authAdmin(handleDeleteStar))
+	mux.HandleFunc("DELETE /redemption/{id}", authAdmin(handleDeleteRedemption))
 	mux.HandleFunc("GET /admin", authAdmin(handleAdmin))
 	mux.HandleFunc("POST /admin/star", authAdmin(handleAddStar))
 	mux.HandleFunc("POST /admin/apikey", authAdmin(handleGenerateAPIKey))

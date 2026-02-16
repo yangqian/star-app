@@ -11,16 +11,22 @@ type User struct {
 }
 
 type Star struct {
-	ID            int
-	UserID        int
-	Username      string
-	ReasonID      *int
-	ReasonText    string
-	Reason        string
-	Stars         int
-	AwardedBy     int
-	AwardedByName string
-	CreatedAt     time.Time
+	ID              int
+	UserID          int
+	Username        string
+	UsernameEN      string
+	UsernameCN      string
+	UsernameTW      string
+	ReasonID        *int
+	ReasonText      string
+	Reason          string
+	Stars           int
+	AwardedBy       int
+	AwardedByName   string
+	AwardedByNameEN string
+	AwardedByNameCN string
+	AwardedByNameTW string
+	CreatedAt       time.Time
 }
 
 type Reason struct {
@@ -52,13 +58,16 @@ type Reward struct {
 }
 
 type Redemption struct {
-	ID                 int
-	UserID             int
-	Username           string
-	RewardName         string
-	RewardNameEN       string
-	RewardNameCN       string
-	RewardNameTW       string
-	Cost               int
-	CreatedAt          time.Time
+	ID           int
+	UserID       int
+	Username     string
+	UsernameEN   string
+	UsernameCN   string
+	UsernameTW   string
+	RewardName   string
+	RewardNameEN string
+	RewardNameCN string
+	RewardNameTW string
+	Cost         int
+	CreatedAt    time.Time
 }

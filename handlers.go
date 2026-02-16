@@ -38,15 +38,21 @@ func handleDashboard(w http.ResponseWriter, r *http.Request) {
 
 	// Load all translations for each star
 	type DisplayStar struct {
-		ID            int
-		Username      string
-		Display       string
-		Stars         int
-		ReasonEN      string
-		ReasonCN      string
-		ReasonTW      string
-		AwardedByName string
-		CreatedAt     time.Time
+		ID              int
+		Username        string
+		UsernameEN      string
+		UsernameCN      string
+		UsernameTW      string
+		Display         string
+		Stars           int
+		ReasonEN        string
+		ReasonCN        string
+		ReasonTW        string
+		AwardedByName   string
+		AwardedByNameEN string
+		AwardedByNameCN string
+		AwardedByNameTW string
+		CreatedAt       time.Time
 	}
 	var consolidated []DisplayStar
 	for i := 0; i < len(stars); {
@@ -76,15 +82,21 @@ func handleDashboard(w http.ResponseWriter, r *http.Request) {
 		}
 
 		ds := DisplayStar{
-			ID:            stars[i].ID,
-			Username:      stars[i].Username,
-			Display:       display,
-			Stars:         starCount,
-			ReasonEN:      en,
-			ReasonCN:      cn,
-			ReasonTW:      tw,
-			AwardedByName: stars[i].AwardedByName,
-			CreatedAt:     stars[i].CreatedAt,
+			ID:              stars[i].ID,
+			Username:        stars[i].Username,
+			UsernameEN:      stars[i].UsernameEN,
+			UsernameCN:      stars[i].UsernameCN,
+			UsernameTW:      stars[i].UsernameTW,
+			Display:         display,
+			Stars:           starCount,
+			ReasonEN:        en,
+			ReasonCN:        cn,
+			ReasonTW:        tw,
+			AwardedByName:   stars[i].AwardedByName,
+			AwardedByNameEN: stars[i].AwardedByNameEN,
+			AwardedByNameCN: stars[i].AwardedByNameCN,
+			AwardedByNameTW: stars[i].AwardedByNameTW,
+			CreatedAt:       stars[i].CreatedAt,
 		}
 		consolidated = append(consolidated, ds)
 		i = j
@@ -305,13 +317,51 @@ func handleUpdateUserTranslation(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleDeleteStar(w http.ResponseWriter, r *http.Request) {
+	user := getContextUser(r)
 	idStr := r.PathValue("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "invalid id", http.StatusBadRequest)
 		return
 	}
+
+	// Check if the star belongs to the current user
+	star, err := getStarByID(id)
+	if err != nil {
+		http.Error(w, "star not found", http.StatusNotFound)
+		return
+	}
+	if star.UserID == user.ID {
+		http.Error(w, "cannot delete your own stars", http.StatusForbidden)
+		return
+	}
+
 	deleteStar(id)
+	counts, _ := getUserStarCounts()
+	jsonResponse(w, counts)
+}
+
+func handleDeleteRedemption(w http.ResponseWriter, r *http.Request) {
+	user := getContextUser(r)
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	// Check if the redemption belongs to the current user
+	redemption, err := getRedemptionByID(id)
+	if err != nil {
+		http.Error(w, "redemption not found", http.StatusNotFound)
+		return
+	}
+	if redemption.UserID == user.ID {
+		http.Error(w, "cannot delete your own redemptions", http.StatusForbidden)
+		return
+	}
+
+	deleteRedemption(id)
 	counts, _ := getUserStarCounts()
 	jsonResponse(w, counts)
 }

@@ -389,6 +389,18 @@ func getStars(filterUsername string) ([]Star, error) {
 			continue
 		}
 
+		// Get user translations
+		s.UsernameEN = getUserText(s.UserID, "en")
+		s.UsernameCN = getUserText(s.UserID, "zh-CN")
+		s.UsernameTW = getUserText(s.UserID, "zh-TW")
+
+		// Get awarded_by user translations if awarded_by is set
+		if s.AwardedBy > 0 {
+			s.AwardedByNameEN = getUserText(s.AwardedBy, "en")
+			s.AwardedByNameCN = getUserText(s.AwardedBy, "zh-CN")
+			s.AwardedByNameTW = getUserText(s.AwardedBy, "zh-TW")
+		}
+
 		// Handle NULL reason_text
 		if reasonText.Valid {
 			s.ReasonText = reasonText.String
@@ -523,8 +535,37 @@ func deleteReason(reasonID int) error {
 	return err
 }
 
+func getStarByID(id int) (*Star, error) {
+	var s Star
+	var reasonText sql.NullString
+	err := db.QueryRow("SELECT id, user_id, reason_id, reason_text, stars, awarded_by FROM stars WHERE id = ?", id).
+		Scan(&s.ID, &s.UserID, &s.ReasonID, &reasonText, &s.Stars, &s.AwardedBy)
+	if err != nil {
+		return nil, err
+	}
+	if reasonText.Valid {
+		s.ReasonText = reasonText.String
+	}
+	return &s, nil
+}
+
 func deleteStar(id int) error {
 	_, err := db.Exec("DELETE FROM stars WHERE id = ?", id)
+	return err
+}
+
+func getRedemptionByID(id int) (*Redemption, error) {
+	var r Redemption
+	err := db.QueryRow("SELECT id, user_id FROM redemptions WHERE id = ?", id).
+		Scan(&r.ID, &r.UserID)
+	if err != nil {
+		return nil, err
+	}
+	return &r, nil
+}
+
+func deleteRedemption(id int) error {
+	_, err := db.Exec("DELETE FROM redemptions WHERE id = ?", id)
 	return err
 }
 
@@ -802,6 +843,11 @@ func getRecentRedemptions(limit int, filterUserID int) ([]Redemption, error) {
 			fmt.Printf("Error scanning redemption row: %v\n", err)
 			continue
 		}
+
+		// Get all translations for this user
+		r.UsernameEN = getUserText(r.UserID, "en")
+		r.UsernameCN = getUserText(r.UserID, "zh-CN")
+		r.UsernameTW = getUserText(r.UserID, "zh-TW")
 
 		// Get all translations for this reward
 		r.RewardNameEN = getRewardText(rewardID, "en")

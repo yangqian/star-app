@@ -183,8 +183,33 @@ function submitStar(reason, reasonId, stars) {
             tr.dataset.username = username;
             tr.dataset.starId = data.starId || '';
             var now = new Date();
-            var month = now.toLocaleString('en-US', {month: 'short'});
-            var time = month + ' ' + now.getDate() + ' ' + now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+            var isoTime = now.toISOString();
+
+            // Format time using current language
+            var locale = currentLang === 'zh-CN' ? 'zh-CN' : (currentLang === 'zh-TW' ? 'zh-TW' : 'en-US');
+            var options = { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false };
+            var time = now.toLocaleString(locale, options);
+            if (currentLang === 'en') {
+                time = time.replace(',', '');
+            }
+
+            // Get user translations for username
+            var userCard = document.querySelector('.member-card[data-username="' + username + '"]');
+            var usernameHtml = '<td class="user-name"';
+            if (userCard) {
+                var userNameEl = userCard.querySelector('.user-name');
+                if (userNameEl) {
+                    usernameHtml += ' data-en="' + (userNameEl.getAttribute('data-en') || '') + '"';
+                    usernameHtml += ' data-zh-cn="' + (userNameEl.getAttribute('data-zh-cn') || '') + '"';
+                    usernameHtml += ' data-zh-tw="' + (userNameEl.getAttribute('data-zh-tw') || '') + '"';
+                    usernameHtml += '>' + (userNameEl.getAttribute('data-' + (currentLang === 'zh-CN' ? 'zh-cn' : (currentLang === 'zh-TW' ? 'zh-tw' : 'en'))) || username);
+                } else {
+                    usernameHtml += '>' + username;
+                }
+            } else {
+                usernameHtml += '>' + username;
+            }
+            usernameHtml += '</td>';
 
             // Get translations from the reason item if it's a predefined reason
             var reasonTd = '<td class="star-reason"';
@@ -198,11 +223,29 @@ function submitStar(reason, reasonId, stars) {
             }
             reasonTd += '>' + reason + '</td>';
 
+            // Get awarded by user translations
+            var awardedByHtml = '<td class="user-name"';
+            var awardedByCard = document.querySelector('.member-card[data-username="' + data.awardedBy + '"]');
+            if (awardedByCard) {
+                var awardedByNameEl = awardedByCard.querySelector('.user-name');
+                if (awardedByNameEl) {
+                    awardedByHtml += ' data-en="' + (awardedByNameEl.getAttribute('data-en') || '') + '"';
+                    awardedByHtml += ' data-zh-cn="' + (awardedByNameEl.getAttribute('data-zh-cn') || '') + '"';
+                    awardedByHtml += ' data-zh-tw="' + (awardedByNameEl.getAttribute('data-zh-tw') || '') + '"';
+                    awardedByHtml += '>' + (awardedByNameEl.getAttribute('data-' + (currentLang === 'zh-CN' ? 'zh-cn' : (currentLang === 'zh-TW' ? 'zh-tw' : 'en'))) || data.awardedBy);
+                } else {
+                    awardedByHtml += '>' + data.awardedBy;
+                }
+            } else {
+                awardedByHtml += '>' + data.awardedBy;
+            }
+            awardedByHtml += '</td>';
+
             // Check if user is admin to add undo button
             var actionBar = document.getElementById('actionBar');
             var actionTd = actionBar ? '<td><button class="btn-undo" onclick="undoStar(' + (data.starId || '') + ')" title="Remove this star">✕</button></td>' : '<td></td>';
 
-            tr.innerHTML = '<td>' + username + '</td>' + reasonTd + '<td>' + data.awardedBy + '</td><td>' + time + '</td>' + actionTd;
+            tr.innerHTML = usernameHtml + reasonTd + awardedByHtml + '<td class="local-time" data-time="' + isoTime + '">' + time + '</td>' + actionTd;
             tbody.insertBefore(tr, tbody.firstChild);
             playStarAnim(username, '⭐');
             awardNext(i + 1);
@@ -243,9 +286,35 @@ function submitRedeem(rewardId, rewardName, cost) {
             var tr = document.createElement('tr');
             tr.dataset.username = username;
             var now = new Date();
-            var month = now.toLocaleString('en-US', {month: 'short'});
-            var time = month + ' ' + now.getDate() + ' ' + now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
-            tr.innerHTML = '<td>' + username + '</td><td>' + data.rewardName + '</td><td>' + data.cost + ' ⭐</td><td>' + time + '</td>';
+            var isoTime = now.toISOString();
+
+            // Format time using current language
+            var locale = currentLang === 'zh-CN' ? 'zh-CN' : (currentLang === 'zh-TW' ? 'zh-TW' : 'en-US');
+            var options = { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false };
+            var time = now.toLocaleString(locale, options);
+            if (currentLang === 'en') {
+                time = time.replace(',', '');
+            }
+
+            // Get user translations for username
+            var userCard = document.querySelector('.member-card[data-username="' + username + '"]');
+            var usernameHtml = '<td class="user-name"';
+            if (userCard) {
+                var userNameEl = userCard.querySelector('.user-name');
+                if (userNameEl) {
+                    usernameHtml += ' data-en="' + (userNameEl.getAttribute('data-en') || '') + '"';
+                    usernameHtml += ' data-zh-cn="' + (userNameEl.getAttribute('data-zh-cn') || '') + '"';
+                    usernameHtml += ' data-zh-tw="' + (userNameEl.getAttribute('data-zh-tw') || '') + '"';
+                    usernameHtml += '>' + (userNameEl.getAttribute('data-' + (currentLang === 'zh-CN' ? 'zh-cn' : (currentLang === 'zh-TW' ? 'zh-tw' : 'en'))) || username);
+                } else {
+                    usernameHtml += '>' + username;
+                }
+            } else {
+                usernameHtml += '>' + username;
+            }
+            usernameHtml += '</td>';
+
+            tr.innerHTML = usernameHtml + '<td>' + data.rewardName + '</td><td>' + data.cost + ' ⭐</td><td class="local-time" data-time="' + isoTime + '">' + time + '</td>';
             tbody.insertBefore(tr, tbody.firstChild);
             playStarAnim(username, '🎁');
             redeemNext(i + 1);
@@ -388,6 +457,17 @@ function undoStar(id) {
     .then(function(resp) { return resp.json(); })
     .then(function(counts) {
         var row = document.querySelector('tr[data-star-id="' + id + '"]');
+        if (row) row.remove();
+        updateStarCounts(counts);
+    });
+}
+
+function undoRedemption(id) {
+    if (!confirm("Remove this redemption?")) return;
+    fetch("/redemption/" + id, { method: "DELETE" })
+    .then(function(resp) { return resp.json(); })
+    .then(function(counts) {
+        var row = document.querySelector('tr[data-redemption-id="' + id + '"]');
         if (row) row.remove();
         updateStarCounts(counts);
     });
