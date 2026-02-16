@@ -3,25 +3,45 @@
 
 <section>
     <h2 data-i18n="award_a_star">Award a Star</h2>
-    <form method="POST" action="/admin/star">
-        <label data-i18n="family_member">Family Member</label>
-        <select name="username" required>
-            <option value="" data-i18n="select">Select...</option>
-            {{range .Users}}
-            <option value="{{.Username}}">{{.Username}}</option>
-            {{end}}
-        </select>
-
-        <label data-i18n="reason">Reason</label>
-        <input type="text" name="reason" id="reason-input" list="reason-list" data-i18n-placeholder="what_did_they_do" placeholder="What did they do?" required>
-        <datalist id="reason-list">
+    <table>
+        <thead><tr><th data-i18n="who">Who</th><th data-i18n="reason">Reason</th><th data-i18n="count">Count</th><th data-i18n="actions">Actions</th></tr></thead>
+        <tbody>
             {{range .Reasons}}
-            <option value="{{.Text}}">
+            <tr>
+                <form method="POST" action="/admin/star" style="background:none;padding:0;margin:0;box-shadow:none;">
+                    <td>
+                        <select name="username" required style="width:100%">
+                            <option value="" data-i18n="select">Select...</option>
+                            {{range $.Users}}
+                            <option value="{{.Username}}">{{.Username}}</option>
+                            {{end}}
+                        </select>
+                    </td>
+                    <td><input type="text" name="reason" value="{{index .Translations "en"}}" required style="width:100%"></td>
+                    <td style="text-align:center">{{.Count}}</td>
+                    <td><button type="submit" data-i18n="award">Award</button></td>
+                </form>
+            </tr>
+            {{else}}
+            <tr><td colspan="4" data-i18n="no_reasons">No reasons used yet</td></tr>
             {{end}}
-        </datalist>
-
-        <button type="submit" data-i18n="award_star">Award Star</button>
-    </form>
+            <tr>
+                <form method="POST" action="/admin/star" style="background:none;padding:0;margin:0;box-shadow:none;">
+                    <td>
+                        <select name="username" required style="width:100%">
+                            <option value="" data-i18n="select">Select...</option>
+                            {{range $.Users}}
+                            <option value="{{.Username}}">{{.Username}}</option>
+                            {{end}}
+                        </select>
+                    </td>
+                    <td><input type="text" name="reason" data-i18n-placeholder="what_did_they_do" placeholder="What did they do?" required style="width:100%"></td>
+                    <td></td>
+                    <td><button type="submit" data-i18n="award">Award</button></td>
+                </form>
+            </tr>
+        </tbody>
+    </table>
 </section>
 
 <section>
@@ -104,6 +124,38 @@
         <input type="text" name="ha_media_player" value="{{.HAMediaPlayer}}" placeholder="media_player.home_2">
         <button type="submit" data-i18n="save">Save</button>
     </form>
+</section>
+
+<section>
+    <h2>Reason Translations <span style="font-size:0.8rem;font-weight:normal;">(Click to edit)</span></h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Key</th>
+                <th>English</th>
+                <th>简体中文</th>
+                <th>繁體中文</th>
+                <th data-i18n="count">Count</th>
+                <th data-i18n="actions">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .Reasons}}
+            <tr>
+                <td>{{.Key}}</td>
+                <td class="editable-trans" onclick="editReasonTrans({{.ID}}, 'en', this)">{{index .Translations "en"}}</td>
+                <td class="editable-trans" onclick="editReasonTrans({{.ID}}, 'zh-CN', this)">{{index .Translations "zh-CN"}}</td>
+                <td class="editable-trans" onclick="editReasonTrans({{.ID}}, 'zh-TW', this)">{{index .Translations "zh-TW"}}</td>
+                <td style="text-align:center">{{.Count}}</td>
+                <td>
+                    <button class="btn-danger" onclick="deleteReasonEntry({{.ID}})" data-i18n="delete">Delete</button>
+                </td>
+            </tr>
+            {{else}}
+            <tr><td colspan="6" data-i18n="no_reasons">No reasons used yet</td></tr>
+            {{end}}
+        </tbody>
+    </table>
 </section>
 {{end}}
 {{template "layout" .}}

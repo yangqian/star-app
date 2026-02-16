@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
+	"time"
 
 	_ "modernc.org/sqlite"
 	"golang.org/x/crypto/bcrypt"
@@ -19,8 +20,19 @@ func initDB(dbPath string) error {
 		return err
 	}
 
-	db.Exec("PRAGMA journal_mode=WAL")
-	db.Exec("PRAGMA foreign_keys=ON")
+	// Test connection
+	if err := db.Ping(); err != nil {
+		return err
+	}
+
+	_, err = db.Exec("PRAGMA journal_mode=WAL")
+	if err != nil {
+		return fmt.Errorf("failed to set WAL mode: %w", err)
+	}
+	_, err = db.Exec("PRAGMA foreign_keys=ON")
+	if err != nil {
+		return fmt.Errorf("failed to enable foreign keys: %w", err)
+	}
 
 	schema := `
 	CREATE TABLE IF NOT EXISTS users (
@@ -29,17 +41,27 @@ func initDB(dbPath string) error {
 		password_hash TEXT NOT NULL,
 		is_admin BOOLEAN DEFAULT FALSE
 	);
+	CREATE TABLE IF NOT EXISTS reasons (
+		id INTEGER PRIMARY KEY,
+		key TEXT UNIQUE NOT NULL,
+		stars INTEGER NOT NULL DEFAULT 1,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+	CREATE TABLE IF NOT EXISTS reason_translations (
+		id INTEGER PRIMARY KEY,
+		reason_id INTEGER NOT NULL REFERENCES reasons(id) ON DELETE CASCADE,
+		lang TEXT NOT NULL,
+		text TEXT NOT NULL,
+		UNIQUE(reason_id, lang)
+	);
 	CREATE TABLE IF NOT EXISTS stars (
 		id INTEGER PRIMARY KEY,
 		user_id INTEGER NOT NULL REFERENCES users(id),
-		reason TEXT NOT NULL,
+		reason_id INTEGER REFERENCES reasons(id),
+		reason_text TEXT,
+		stars INTEGER NOT NULL DEFAULT 1,
 		awarded_by INTEGER REFERENCES users(id),
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-	);
-	CREATE TABLE IF NOT EXISTS reasons (
-		id INTEGER PRIMARY KEY,
-		text TEXT UNIQUE NOT NULL,
-		count INTEGER DEFAULT 0
 	);
 	CREATE TABLE IF NOT EXISTS api_keys (
 		id INTEGER PRIMARY KEY,
@@ -186,8 +208,8 @@ type UserStarCount struct {
 
 func getUserStarCounts() ([]UserStarCount, error) {
 	rows, err := db.Query(`
-		SELECT u.username, u.is_admin, COUNT(s.id) as star_count,
-			COUNT(s.id) - COALESCE((SELECT SUM(rw.cost) FROM redemptions rd JOIN rewards rw ON rd.reward_id = rw.id WHERE rd.user_id = u.id), 0) as current_stars
+		SELECT u.username, u.is_admin, COALESCE(SUM(s.stars), 0) as star_count,
+			COALESCE(SUM(s.stars), 0) - COALESCE((SELECT SUM(rw.cost) FROM redemptions rd JOIN rewards rw ON rd.reward_id = rw.id WHERE rd.user_id = u.id), 0) as current_stars
 		FROM users u LEFT JOIN stars s ON u.id = s.user_id
 		GROUP BY u.id ORDER BY star_count DESC`)
 	if err != nil {
@@ -205,7 +227,7 @@ func getUserStarCounts() ([]UserStarCount, error) {
 }
 
 func getStars(filterUsername string) ([]Star, error) {
-	query := `SELECT s.id, s.user_id, u.username, s.reason, s.awarded_by, COALESCE(a.username,''), s.created_at
+	query := `SELECT s.id, s.user_id, u.username, s.reason_id, s.reason_text, s.stars, s.awarded_by, COALESCE(a.username,''), s.created_at
 		FROM stars s
 		JOIN users u ON s.user_id = u.id
 		LEFT JOIN users a ON s.awarded_by = a.id`
@@ -225,27 +247,119 @@ func getStars(filterUsername string) ([]Star, error) {
 	var stars []Star
 	for rows.Next() {
 		var s Star
-		rows.Scan(&s.ID, &s.UserID, &s.Username, &s.Reason, &s.AwardedBy, &s.AwardedByName, &s.CreatedAt)
+		var reasonText sql.NullString
+		var createdAtStr sql.NullString
+		err := rows.Scan(&s.ID, &s.UserID, &s.Username, &s.ReasonID, &reasonText, &s.Stars, &s.AwardedBy, &s.AwardedByName, &createdAtStr)
+		if err != nil {
+			fmt.Printf("Error scanning star row: %v\n", err)
+			continue
+		}
+
+		// Handle NULL reason_text
+		if reasonText.Valid {
+			s.ReasonText = reasonText.String
+		}
+
+		// Parse the datetime string - modernc.org/sqlite returns RFC3339 format
+		if createdAtStr.Valid && createdAtStr.String != "" {
+			// Try RFC3339 first (what modernc.org/sqlite returns)
+			if t, err := time.Parse(time.RFC3339, createdAtStr.String); err == nil {
+				s.CreatedAt = t
+			} else if t, err := time.Parse("2006-01-02 15:04:05", createdAtStr.String); err == nil {
+				s.CreatedAt = t
+			}
+		}
 		stars = append(stars, s)
 	}
 	return stars, nil
 }
 
 func addStar(username, reason string, awardedBy int) error {
+	_, err := addStarWithID(username, nil, reason, 1, awardedBy)
+	return err
+}
+
+func addStarWithID(username string, reasonID *int, reasonText string, stars int, awardedBy int) (int64, error) {
+	if stars < 1 {
+		stars = 1
+	}
 	user, err := getUserByUsername(username)
 	if err != nil {
-		return fmt.Errorf("user not found: %s", username)
+		return 0, fmt.Errorf("user not found: %s", username)
 	}
 
-	_, err = db.Exec("INSERT INTO stars (user_id, reason, awarded_by) VALUES (?, ?, ?)",
-		user.ID, reason, awardedBy)
+	// If reason ID provided, use it directly
+	if reasonID != nil && *reasonID > 0 {
+		result, err := db.Exec("INSERT INTO stars (user_id, reason_id, stars, awarded_by) VALUES (?, ?, ?, ?)",
+			user.ID, reasonID, stars, awardedBy)
+		if err != nil {
+			return 0, err
+		}
+		return result.LastInsertId()
+	}
+
+	// Otherwise, create a new reason from text
+	if reasonText == "" {
+		return 0, fmt.Errorf("reason required")
+	}
+
+	// Try to find existing reason by matching English translation
+	var existingID *int
+	err = db.QueryRow("SELECT r.id FROM reasons r JOIN reason_translations rt ON r.id = rt.reason_id WHERE rt.text = ? AND rt.lang = 'en'", reasonText).Scan(&existingID)
+
+	if err == nil && existingID != nil {
+		// Found existing reason, use it
+		reasonID = existingID
+	} else {
+		// Create new reason
+		key := sanitizeKey(reasonText)
+		result, err := db.Exec("INSERT INTO reasons (key) VALUES (?)", key)
+		if err != nil {
+			return 0, err
+		}
+		id, _ := result.LastInsertId()
+		rid := int(id)
+		reasonID = &rid
+
+		// Add English translation
+		db.Exec("INSERT INTO reason_translations (reason_id, lang, text) VALUES (?, 'en', ?)", rid, reasonText)
+	}
+
+	result, err := db.Exec("INSERT INTO stars (user_id, reason_id, stars, awarded_by) VALUES (?, ?, ?, ?)",
+		user.ID, reasonID, stars, awardedBy)
 	if err != nil {
-		return err
+		return 0, err
 	}
+	return result.LastInsertId()
+}
 
-	// Update reason frequency
-	_, err = db.Exec(`INSERT INTO reasons (text, count) VALUES (?, 1)
-		ON CONFLICT(text) DO UPDATE SET count = count + 1`, reason)
+func sanitizeKey(text string) string {
+	// Simple key generation from text
+	key := ""
+	for _, r := range text {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			key += string(r)
+		} else if r == ' ' {
+			key += "_"
+		}
+	}
+	if key == "" {
+		key = "custom"
+	}
+	// Add timestamp to ensure uniqueness
+	return key
+}
+
+func updateReasonTranslation(reasonID int, lang, text string) error {
+	_, err := db.Exec(`
+		INSERT INTO reason_translations (reason_id, lang, text) VALUES (?, ?, ?)
+		ON CONFLICT(reason_id, lang) DO UPDATE SET text = ?
+	`, reasonID, lang, text, text)
+	return err
+}
+
+func deleteReason(reasonID int) error {
+	_, err := db.Exec("DELETE FROM reasons WHERE id = ?", reasonID)
 	return err
 }
 
@@ -255,7 +369,14 @@ func deleteStar(id int) error {
 }
 
 func getReasons() ([]Reason, error) {
-	rows, err := db.Query("SELECT id, text, count FROM reasons ORDER BY count DESC")
+	// Get reasons with star count
+	rows, err := db.Query(`
+		SELECT r.id, r.key, COUNT(s.id) as count
+		FROM reasons r
+		LEFT JOIN stars s ON r.id = s.reason_id
+		GROUP BY r.id, r.key
+		ORDER BY count DESC
+	`)
 	if err != nil {
 		return nil, err
 	}
@@ -264,10 +385,38 @@ func getReasons() ([]Reason, error) {
 	var reasons []Reason
 	for rows.Next() {
 		var r Reason
-		rows.Scan(&r.ID, &r.Text, &r.Count)
+		r.Translations = make(map[string]string)
+		rows.Scan(&r.ID, &r.Key, &r.Count)
+
+		// Load all translations for this reason
+		tRows, _ := db.Query("SELECT lang, text FROM reason_translations WHERE reason_id = ?", r.ID)
+		for tRows.Next() {
+			var lang, text string
+			tRows.Scan(&lang, &text)
+			r.Translations[lang] = text
+		}
+		tRows.Close()
+
 		reasons = append(reasons, r)
 	}
 	return reasons, nil
+}
+
+func getReasonText(reasonID *int, reasonText string, lang string) string {
+	if reasonID != nil && *reasonID > 0 {
+		var text string
+		// Try to get translation in requested language
+		err := db.QueryRow("SELECT text FROM reason_translations WHERE reason_id = ? AND lang = ?", reasonID, lang).Scan(&text)
+		if err == nil && text != "" {
+			return text
+		}
+		// Fallback to English
+		err = db.QueryRow("SELECT text FROM reason_translations WHERE reason_id = ? AND lang = 'en'", reasonID).Scan(&text)
+		if err == nil && text != "" {
+			return text
+		}
+	}
+	return reasonText
 }
 
 func hashAPIKey(key string) string {
@@ -369,7 +518,7 @@ func getRewardByID(id int) (*Reward, error) {
 func getUserCurrentStars(userID int) (int, error) {
 	var current int
 	err := db.QueryRow(`
-		SELECT COUNT(s.id) - COALESCE((SELECT SUM(rw.cost) FROM redemptions rd JOIN rewards rw ON rd.reward_id = rw.id WHERE rd.user_id = ?), 0)
+		SELECT COALESCE(SUM(s.stars), 0) - COALESCE((SELECT SUM(rw.cost) FROM redemptions rd JOIN rewards rw ON rd.reward_id = rw.id WHERE rd.user_id = ?), 0)
 		FROM stars s WHERE s.user_id = ?`, userID, userID).Scan(&current)
 	return current, err
 }
@@ -412,7 +561,21 @@ func getRecentRedemptions(limit int, filterUserID int) ([]Redemption, error) {
 	var results []Redemption
 	for rows.Next() {
 		var r Redemption
-		rows.Scan(&r.ID, &r.UserID, &r.Username, &r.RewardName, &r.Cost, &r.CreatedAt)
+		var createdAtStr sql.NullString
+		err := rows.Scan(&r.ID, &r.UserID, &r.Username, &r.RewardName, &r.Cost, &createdAtStr)
+		if err != nil {
+			fmt.Printf("Error scanning redemption row: %v\n", err)
+			continue
+		}
+		// Parse the datetime string - modernc.org/sqlite returns RFC3339 format
+		if createdAtStr.Valid && createdAtStr.String != "" {
+			// Try RFC3339 first (what modernc.org/sqlite returns)
+			if t, err := time.Parse(time.RFC3339, createdAtStr.String); err == nil {
+				r.CreatedAt = t
+			} else if t, err := time.Parse("2006-01-02 15:04:05", createdAtStr.String); err == nil {
+				r.CreatedAt = t
+			}
+		}
 		results = append(results, r)
 	}
 	return results, nil

@@ -46,7 +46,9 @@
     <h3 data-i18n="choose_reason">Choose a reason</h3>
     <div class="reason-list">
         {{range .Reasons}}
-        <div class="reason-item" onclick="submitStar('{{.Text}}')">{{.Text}} <span class="reason-count">({{.Count}})</span></div>
+        <div class="reason-item reason-trans" data-reason-id="{{.ID}}" data-en="{{index .Translations "en"}}" data-zh-cn="{{index .Translations "zh-CN"}}" data-zh-tw="{{index .Translations "zh-TW"}}" onclick="submitStarByReason({{.ID}})">
+            <span class="reason-text">{{index .Translations "en"}}</span> <span class="reason-count">({{.Count}})</span>
+        </div>
         {{end}}
     </div>
     <div class="reason-custom">
@@ -93,7 +95,7 @@
         {{range .Stars}}
         <tr data-star-id="{{.ID}}" data-username="{{.Username}}">
             <td>{{.Username}}</td>
-            <td>{{.Display}}</td>
+            <td class="star-reason" data-en="{{.ReasonEN}}" data-zh-cn="{{.ReasonCN}}" data-zh-tw="{{.ReasonTW}}">{{.Display}}</td>
             <td>{{.AwardedByName}}</td>
             <td>{{.CreatedAt.Format "Jan 2 15:04"}}</td>
             {{if $.User.IsAdmin}}<td><button class="btn-undo" onclick="undoStar({{.ID}})" title="Remove this star">✕</button></td>{{else}}<td></td>{{end}}

@@ -24,11 +24,17 @@ function updateSelection() {
     document.querySelectorAll('.member-card').forEach(function(c) {
         c.classList.toggle('selected', selectedUsers.indexOf(c.dataset.username) !== -1);
     });
-    // Filter table rows: show only selected users' rows (or all if none selected)
-    var show = selectedUsers.length === 0 ? null : selectedUsers;
-    document.querySelectorAll('table tbody tr[data-username]').forEach(function(row) {
-        row.style.display = (!show || show.indexOf(row.dataset.username) !== -1) ? '' : 'none';
-    });
+    // Filter table rows and hide tables when nothing selected
+    if (selectedUsers.length === 0) {
+        document.querySelectorAll('table').forEach(function(t) { t.style.display = 'none'; });
+        document.querySelectorAll('h2[data-i18n="recent_redemptions"], h2[data-i18n="recent_stars"]').forEach(function(h) { h.style.display = 'none'; });
+    } else {
+        document.querySelectorAll('table').forEach(function(t) { t.style.display = ''; });
+        document.querySelectorAll('h2[data-i18n="recent_redemptions"], h2[data-i18n="recent_stars"]').forEach(function(h) { h.style.display = ''; });
+        document.querySelectorAll('table tbody tr[data-username]').forEach(function(row) {
+            row.style.display = (selectedUsers.indexOf(row.dataset.username) !== -1) ? '' : 'none';
+        });
+    }
     // Update action bar
     var actionBar = document.getElementById('actionBar');
     if (!actionBar) return;
@@ -135,14 +141,26 @@ function playStarAnim(username, emoji) {
     }
 }
 
-function submitStar(reason) {
+function submitStarByReason(reasonId) {
+    var item = document.querySelector('.reason-item[data-reason-id="' + reasonId + '"]');
+    var langKey = currentLang === 'zh-CN' ? 'zh-cn' : (currentLang === 'zh-TW' ? 'zh-tw' : 'en');
+    var reasonText = item.getAttribute('data-' + langKey) || item.getAttribute('data-en');
+    submitStar(reasonText, reasonId);
+}
+
+function submitStar(reason, reasonId) {
     var targets = getSelectedNonSelf();
     if (!reason || targets.length === 0) return;
 
     function awardNext(i) {
         if (i >= targets.length) return;
         var username = targets[i];
-        var body = new URLSearchParams({username: username, reason: reason});
+        var body = new URLSearchParams({username: username});
+        if (reasonId) {
+            body.append('reason_id', reasonId);
+        }
+        body.append('reason', reason);
+
         fetch("/star", {
             method: "POST",
             headers: {"Accept": "application/json"},
@@ -160,10 +178,28 @@ function submitStar(reason) {
             if (noRows) tbody.innerHTML = '';
             var tr = document.createElement('tr');
             tr.dataset.username = username;
+            tr.dataset.starId = data.starId || '';
             var now = new Date();
             var month = now.toLocaleString('en-US', {month: 'short'});
             var time = month + ' ' + now.getDate() + ' ' + now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
-            tr.innerHTML = '<td>' + username + '</td><td>' + reason + '</td><td>' + data.awardedBy + '</td><td>' + time + '</td>';
+
+            // Get translations from the reason item if it's a predefined reason
+            var reasonTd = '<td class="star-reason"';
+            if (reasonId) {
+                var item = document.querySelector('.reason-item[data-reason-id="' + reasonId + '"]');
+                if (item) {
+                    reasonTd += ' data-en="' + (item.getAttribute('data-en') || '') + '"';
+                    reasonTd += ' data-zh-cn="' + (item.getAttribute('data-zh-cn') || '') + '"';
+                    reasonTd += ' data-zh-tw="' + (item.getAttribute('data-zh-tw') || '') + '"';
+                }
+            }
+            reasonTd += '>' + reason + '</td>';
+
+            // Check if user is admin to add undo button
+            var actionBar = document.getElementById('actionBar');
+            var actionTd = actionBar ? '<td><button class="btn-undo" onclick="undoStar(' + (data.starId || '') + ')" title="Remove this star">✕</button></td>' : '<td></td>';
+
+            tr.innerHTML = '<td>' + username + '</td>' + reasonTd + '<td>' + data.awardedBy + '</td><td>' + time + '</td>' + actionTd;
             tbody.insertBefore(tr, tbody.firstChild);
             playStarAnim(username, '⭐');
             awardNext(i + 1);
@@ -213,6 +249,52 @@ function submitRedeem(rewardId, rewardName, cost) {
     redeemNext(0);
 }
 
+function editReasonTrans(reasonId, lang, cell) {
+    var currentText = cell.textContent;
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentText;
+    input.style.width = '100%';
+
+    function save() {
+        var newText = input.value.trim();
+        if (newText && newText !== currentText) {
+            var body = new URLSearchParams({lang: lang, text: newText});
+            fetch("/admin/reason/" + reasonId, {
+                method: "PUT",
+                body: body
+            })
+            .then(function(resp) { return resp.json(); })
+            .then(function() {
+                cell.textContent = newText;
+            });
+        } else {
+            cell.textContent = currentText;
+        }
+    }
+
+    input.onblur = save;
+    input.onkeydown = function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            save();
+        } else if (e.key === 'Escape') {
+            cell.textContent = currentText;
+        }
+    };
+
+    cell.textContent = '';
+    cell.appendChild(input);
+    input.focus();
+    input.select();
+}
+
+function deleteReasonEntry(id) {
+    if (!confirm("Delete this reason and all its translations?")) return;
+    fetch("/admin/reason/" + id, { method: "DELETE" })
+        .then(function() { location.reload(); });
+}
+
 function undoStar(id) {
     if (!confirm("Remove this star?")) return;
     fetch("/star/" + id, { method: "DELETE" })
@@ -249,3 +331,16 @@ function toggleAnnounce() {
         span.setAttribute('data-i18n', on ? 'announce_on' : 'announce_off');
     });
 }
+
+// Auto-select self for non-admin users on page load
+document.addEventListener('DOMContentLoaded', function() {
+    var actionBar = document.getElementById('actionBar');
+    // If no action bar, user is not admin - select self by default
+    if (!actionBar) {
+        var selfCard = document.querySelector('.member-card[data-self="true"]');
+        if (selfCard) {
+            selectedUsers = [selfCard.dataset.username];
+            updateSelection();
+        }
+    }
+});

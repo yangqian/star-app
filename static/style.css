@@ -102,3 +102,12 @@ section { margin-bottom: 2rem; }
 .filter-btn { background: none; border: none; padding: 0.5rem 1rem; cursor: pointer; font-size: 0.85rem; color: #888; margin: 0; border-radius: 0; }
 .filter-btn:hover { background: #ecf0f1; color: #333; }
 .filter-btn.active { background: #3498db; color: white; }
+
+.editable-reason { cursor: pointer; }
+.editable-reason:hover { background: #f0f8ff; }
+.editable-trans { cursor: pointer; }
+.editable-trans:hover { background: #f0f8ff; }
+
+.lang-tab { background: #ecf0f1; color: #666; border: none; padding: 0.5rem 1rem; cursor: pointer; font-size: 0.9rem; border-radius: 6px; margin: 0; transition: background 0.2s, color 0.2s; }
+.lang-tab:hover { background: #dfe6e9; color: #333; }
+.lang-tab.active { background: #3498db; color: white; }

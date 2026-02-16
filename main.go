@@ -65,6 +65,8 @@ func main() {
 	mux.HandleFunc("DELETE /admin/reward/{id}", authAdmin(handleDeleteReward))
 	mux.HandleFunc("POST /admin/settings", authAdmin(handleSaveSettings))
 	mux.HandleFunc("POST /admin/toggle-announce", authAdmin(handleToggleAnnounce))
+	mux.HandleFunc("PUT /admin/reason/{id}", authAdmin(handleUpdateReasonTranslation))
+	mux.HandleFunc("DELETE /admin/reason/{id}", authAdmin(handleDeleteReason))
 
 	// API routes
 	mux.HandleFunc("GET /api/stars", authAPI(handleAPIGetStars))

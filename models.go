@@ -10,19 +10,24 @@ type User struct {
 }
 
 type Star struct {
-	ID         int
-	UserID     int
-	Username   string
-	Reason     string
-	AwardedBy  int
+	ID            int
+	UserID        int
+	Username      string
+	ReasonID      *int
+	ReasonText    string
+	Reason        string
+	Stars         int
+	AwardedBy     int
 	AwardedByName string
-	CreatedAt  time.Time
+	CreatedAt     time.Time
 }
 
 type Reason struct {
-	ID    int
-	Text  string
-	Count int
+	ID           int
+	Key          string
+	Translations map[string]string
+	Count        int
+	Stars        int
 }
 
 type APIKey struct {

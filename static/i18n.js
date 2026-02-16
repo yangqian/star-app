@@ -67,7 +67,11 @@ var translations = {
         ha_url_label: "Home Assistant URL",
         ha_token_label: "Long-Lived Access Token",
         ha_media_player_label: "Media Player Entity",
-        ha_hint: "Leave blank to disable announcements."
+        ha_hint: "Leave blank to disable announcements.",
+        count: "Count",
+        award: "Award",
+        no_reasons: "No reasons used yet",
+        award_custom: "Award Custom"
     },
     "zh-CN": {
         star_tracker: "⭐ 星星记录",
@@ -137,7 +141,11 @@ var translations = {
         ha_url_label: "Home Assistant 地址",
         ha_token_label: "长期访问令牌",
         ha_media_player_label: "媒体播放器实体",
-        ha_hint: "留空则不播报。"
+        ha_hint: "留空则不播报。",
+        count: "次数",
+        award: "奖励",
+        no_reasons: "暂无使用过的原因",
+        award_custom: "自定义奖励"
     },
     "zh-TW": {
         star_tracker: "⭐ 星星記錄",
@@ -207,7 +215,11 @@ var translations = {
         ha_url_label: "Home Assistant 網址",
         ha_token_label: "長期存取權杖",
         ha_media_player_label: "媒體播放器實體",
-        ha_hint: "留空則不播報。"
+        ha_hint: "留空則不播報。",
+        count: "次數",
+        award: "獎勵",
+        no_reasons: "暫無使用過的原因",
+        award_custom: "自訂獎勵"
     }
 };
 
@@ -232,6 +244,27 @@ function applyLang() {
     // Update lang switcher active state
     document.querySelectorAll('.lang-btn').forEach(function(b) {
         b.classList.toggle('active', b.dataset.lang === currentLang);
+    });
+    // Update reason translations in reason panel
+    var langKey = currentLang === 'zh-CN' ? 'zh-cn' : (currentLang === 'zh-TW' ? 'zh-tw' : 'en');
+    document.querySelectorAll('.reason-trans').forEach(function(el) {
+        var text = el.getAttribute('data-' + langKey) || el.getAttribute('data-en');
+        var textEl = el.querySelector('.reason-text');
+        if (textEl && text) textEl.textContent = text;
+    });
+    // Update star history reasons
+    document.querySelectorAll('.star-reason').forEach(function(el) {
+        var text = el.getAttribute('data-' + langKey) || el.getAttribute('data-en');
+        if (text) {
+            // Check if it's a consolidated display (starts with number)
+            var currentText = el.textContent;
+            var match = currentText.match(/^(\d+\s*×\s*)/);
+            if (match) {
+                el.textContent = match[1] + text;
+            } else {
+                el.textContent = text;
+            }
+        }
     });
 }
 

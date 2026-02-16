@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -19,6 +20,7 @@ func randomHex(n int) string {
 
 func handleDashboard(w http.ResponseWriter, r *http.Request) {
 	user := getContextUser(r)
+
 	counts, _ := getUserStarCounts()
 	rewards, _ := getRewardsList()
 	reasons, _ := getReasons()
@@ -34,23 +36,55 @@ func handleDashboard(w http.ResponseWriter, r *http.Request) {
 		redemptions, _ = getRecentRedemptions(10, user.ID)
 	}
 
-	// Consolidate sequential identical awards (same user + reason) into "N x reason"
+	// Load all translations for each star
 	type DisplayStar struct {
-		Star
-		Display string
+		ID            int
+		Username      string
+		Display       string
+		Stars         int
+		ReasonEN      string
+		ReasonCN      string
+		ReasonTW      string
+		AwardedByName string
+		CreatedAt     time.Time
 	}
 	var consolidated []DisplayStar
 	for i := 0; i < len(stars); {
+		// Get all translations for this reason
+		en := getReasonText(stars[i].ReasonID, stars[i].ReasonText, "en")
+		cn := getReasonText(stars[i].ReasonID, stars[i].ReasonText, "zh-CN")
+		tw := getReasonText(stars[i].ReasonID, stars[i].ReasonText, "zh-TW")
+
+		// Find consecutive identical awards
 		j := i + 1
-		for j < len(stars) && stars[j].Username == stars[i].Username && stars[j].Reason == stars[i].Reason {
+		for j < len(stars) && stars[j].Username == stars[i].Username &&
+			getReasonText(stars[j].ReasonID, stars[j].ReasonText, "en") == en {
 			j++
 		}
 		count := j - i
-		ds := DisplayStar{Star: stars[i]}
+
+		display := en
+		starCount := stars[i].Stars
 		if count > 1 {
-			ds.Display = fmt.Sprintf("%d × %s", count, stars[i].Reason)
-		} else {
-			ds.Display = stars[i].Reason
+			// Sum up stars for consolidated entries
+			totalStars := 0
+			for k := i; k < j; k++ {
+				totalStars += stars[k].Stars
+			}
+			starCount = totalStars
+			display = fmt.Sprintf("%d × %s", count, en)
+		}
+
+		ds := DisplayStar{
+			ID:            stars[i].ID,
+			Username:      stars[i].Username,
+			Display:       display,
+			Stars:         starCount,
+			ReasonEN:      en,
+			ReasonCN:      cn,
+			ReasonTW:      tw,
+			AwardedByName: stars[i].AwardedByName,
+			CreatedAt:     stars[i].CreatedAt,
 		}
 		consolidated = append(consolidated, ds)
 		i = j
@@ -117,10 +151,12 @@ func handleLogout(w http.ResponseWriter, r *http.Request) {
 func handleQuickStar(w http.ResponseWriter, r *http.Request) {
 	user := getContextUser(r)
 	username := r.FormValue("username")
-	reason := r.FormValue("reason")
+	reasonIDStr := r.FormValue("reason_id")
+	reasonText := r.FormValue("reason")
+	starsStr := r.FormValue("stars")
 
-	if username == "" || reason == "" {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+	if username == "" || (reasonIDStr == "" && reasonText == "") {
+		http.Error(w, "username and reason required", http.StatusBadRequest)
 		return
 	}
 
@@ -129,14 +165,40 @@ func handleQuickStar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	addStar(username, reason, user.ID)
-	announceStarIfEnabled(username, reason)
+	var reasonID *int
+	if reasonIDStr != "" {
+		id, err := strconv.Atoi(reasonIDStr)
+		if err == nil {
+			reasonID = &id
+		}
+	}
+
+	stars := 1
+	if starsStr != "" {
+		if s, err := strconv.Atoi(starsStr); err == nil && s > 0 {
+			stars = s
+		}
+	}
+
+	starID, err := addStarWithID(username, reasonID, reasonText, stars, user.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// Get reason text for announcement
+	displayText := reasonText
+	if reasonID != nil {
+		displayText = getReasonText(reasonID, reasonText, "en")
+	}
+	announceStarIfEnabled(username, displayText)
 
 	if r.Header.Get("Accept") == "application/json" {
 		counts, _ := getUserStarCounts()
 		jsonResponse(w, map[string]interface{}{
 			"counts":    counts,
 			"awardedBy": user.Username,
+			"starId":    starID,
 		})
 		return
 	}
@@ -183,6 +245,34 @@ func handleRedeem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func handleUpdateReasonTranslation(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	lang := r.FormValue("lang")
+	text := r.FormValue("text")
+	if lang == "" || text == "" {
+		http.Error(w, "lang and text required", http.StatusBadRequest)
+		return
+	}
+	updateReasonTranslation(id, lang, text)
+	jsonResponse(w, map[string]string{"status": "ok"})
+}
+
+func handleDeleteReason(w http.ResponseWriter, r *http.Request) {
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	deleteReason(id)
+	jsonResponse(w, map[string]string{"status": "ok"})
 }
 
 func handleDeleteStar(w http.ResponseWriter, r *http.Request) {
@@ -377,6 +467,7 @@ func handleToggleAnnounce(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonResponse(w, map[string]string{"ha_enabled": getSetting("ha_enabled")})
 }
+
 
 // API handlers
 
