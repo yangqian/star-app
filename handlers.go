@@ -722,7 +722,52 @@ func handleAPIGetStars(w http.ResponseWriter, r *http.Request) {
 	if stars == nil {
 		stars = []Star{}
 	}
-	jsonResponse(w, stars)
+
+	// Enrich with reason translations (consistent with web dashboard)
+	type APIStar struct {
+		ID              int       `json:"id"`
+		UserID          int       `json:"user_id"`
+		Username        string    `json:"username"`
+		UsernameEN      string    `json:"username_en"`
+		UsernameCN      string    `json:"username_cn"`
+		UsernameTW      string    `json:"username_tw"`
+		ReasonID        *int      `json:"reason_id"`
+		ReasonText      string    `json:"reason_text"`
+		ReasonEN        string    `json:"reason_en"`
+		ReasonCN        string    `json:"reason_cn"`
+		ReasonTW        string    `json:"reason_tw"`
+		Stars           int       `json:"stars"`
+		AwardedBy       int       `json:"awarded_by"`
+		AwardedByName   string    `json:"awarded_by_name"`
+		AwardedByNameEN string    `json:"awarded_by_name_en"`
+		AwardedByNameCN string    `json:"awarded_by_name_cn"`
+		AwardedByNameTW string    `json:"awarded_by_name_tw"`
+		CreatedAt       time.Time `json:"created_at"`
+	}
+	result := make([]APIStar, 0, len(stars))
+	for _, s := range stars {
+		result = append(result, APIStar{
+			ID:              s.ID,
+			UserID:          s.UserID,
+			Username:        s.Username,
+			UsernameEN:      s.UsernameEN,
+			UsernameCN:      s.UsernameCN,
+			UsernameTW:      s.UsernameTW,
+			ReasonID:        s.ReasonID,
+			ReasonText:      s.ReasonText,
+			ReasonEN:        getReasonText(s.ReasonID, s.ReasonText, "en"),
+			ReasonCN:        getReasonText(s.ReasonID, s.ReasonText, "zh-CN"),
+			ReasonTW:        getReasonText(s.ReasonID, s.ReasonText, "zh-TW"),
+			Stars:           s.Stars,
+			AwardedBy:       s.AwardedBy,
+			AwardedByName:   s.AwardedByName,
+			AwardedByNameEN: s.AwardedByNameEN,
+			AwardedByNameCN: s.AwardedByNameCN,
+			AwardedByNameTW: s.AwardedByNameTW,
+			CreatedAt:       s.CreatedAt,
+		})
+	}
+	jsonResponse(w, result)
 }
 
 func handleAPIAddStar(w http.ResponseWriter, r *http.Request) {
@@ -780,6 +825,40 @@ func handleAPIGetReasons(w http.ResponseWriter, r *http.Request) {
 		reasons = []Reason{}
 	}
 	jsonResponse(w, reasons)
+}
+
+func handleAPIGetRewards(w http.ResponseWriter, r *http.Request) {
+	rewards, err := getRewardsList()
+	if err != nil {
+		jsonError(w, "failed to get rewards", http.StatusInternalServerError)
+		return
+	}
+	if rewards == nil {
+		rewards = []Reward{}
+	}
+	jsonResponse(w, rewards)
+}
+
+func handleAPIGetRedemptions(w http.ResponseWriter, r *http.Request) {
+	username := r.URL.Query().Get("user")
+	filterUserID := 0
+	if username != "" {
+		user, err := getUserByUsername(username)
+		if err != nil {
+			jsonError(w, "user not found", http.StatusBadRequest)
+			return
+		}
+		filterUserID = user.ID
+	}
+	redemptions, err := getRecentRedemptions(10000, filterUserID)
+	if err != nil {
+		jsonError(w, "failed to get redemptions", http.StatusInternalServerError)
+		return
+	}
+	if redemptions == nil {
+		redemptions = []Redemption{}
+	}
+	jsonResponse(w, redemptions)
 }
 
 func jsonResponse(w http.ResponseWriter, data interface{}) {

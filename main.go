@@ -82,6 +82,8 @@ func main() {
 	mux.HandleFunc("POST /api/stars", authAPI(handleAPIAddStar))
 	mux.HandleFunc("GET /api/users", authAPI(handleAPIGetUsers))
 	mux.HandleFunc("GET /api/reasons", authAPI(handleAPIGetReasons))
+	mux.HandleFunc("GET /api/rewards", authAPI(handleAPIGetRewards))
+	mux.HandleFunc("GET /api/redemptions", authAPI(handleAPIGetRedemptions))
 
 	addr := fmt.Sprintf(":%d", *port)
 	log.Printf("Star Tracker listening on %s", addr)

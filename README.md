@@ -113,7 +113,7 @@ Returns all users with their star counts.
 
 ### GET /api/stars
 
-Returns star award history.
+Returns star award history with fully resolved translations for reasons, usernames, and awarder names.
 
 **Query Parameters:**
 
@@ -126,38 +126,42 @@ Returns star award history.
 ```json
 [
   {
-    "ID": 1,
-    "UserID": 3,
-    "Username": "theo",
-    "UsernameEN": "Theo",
-    "UsernameCN": "西奥",
-    "UsernameTW": "西奧",
-    "ReasonID": 2,
-    "ReasonText": "",
-    "Stars": 1,
-    "AwardedBy": 1,
-    "AwardedByName": "dad",
-    "AwardedByNameEN": "Dad",
-    "AwardedByNameCN": "爸爸",
-    "AwardedByNameTW": "爸爸",
-    "CreatedAt": "2025-01-15T10:30:00Z"
+    "id": 1,
+    "user_id": 3,
+    "username": "theo",
+    "username_en": "Theo",
+    "username_cn": "西奥",
+    "username_tw": "西奧",
+    "reason_id": 2,
+    "reason_text": "",
+    "reason_en": "Cleaned room",
+    "reason_cn": "打扫房间",
+    "reason_tw": "打掃房間",
+    "stars": 1,
+    "awarded_by": 1,
+    "awarded_by_name": "dad",
+    "awarded_by_name_en": "Dad",
+    "awarded_by_name_cn": "爸爸",
+    "awarded_by_name_tw": "爸爸",
+    "created_at": "2025-01-15T10:30:00Z"
   }
 ]
 ```
 
-| Field              | Type      | Description                                    |
-|--------------------|-----------|------------------------------------------------|
-| `ID`               | int       | Star record ID                                 |
-| `UserID`           | int       | Recipient user ID                              |
-| `Username`         | string    | Recipient username                             |
-| `UsernameEN/CN/TW` | string    | Translated display names                       |
-| `ReasonID`         | int\|null | Reference to a predefined reason (nullable)    |
-| `ReasonText`       | string    | Free-text reason (used when no ReasonID)       |
-| `Stars`            | int       | Number of stars (negative for penalties)        |
-| `AwardedBy`        | int       | User ID of the person who awarded the star     |
-| `AwardedByName`    | string    | Username of awarder                            |
-| `AwardedByNameEN/CN/TW` | string | Translated awarder names                  |
-| `CreatedAt`        | datetime  | When the star was awarded (RFC3339)            |
+| Field                    | Type      | Description                                    |
+|--------------------------|-----------|------------------------------------------------|
+| `id`                     | int       | Star record ID                                 |
+| `user_id`                | int       | Recipient user ID                              |
+| `username`               | string    | Recipient username                             |
+| `username_en/cn/tw`      | string    | Translated display names                       |
+| `reason_id`              | int\|null | Reference to a predefined reason (nullable)    |
+| `reason_text`            | string    | Free-text reason (used when no reason_id)      |
+| `reason_en/cn/tw`        | string    | Resolved reason translations                   |
+| `stars`                  | int       | Number of stars (negative for penalties)        |
+| `awarded_by`             | int       | User ID of the person who awarded the star     |
+| `awarded_by_name`        | string    | Username of awarder                            |
+| `awarded_by_name_en/cn/tw` | string  | Translated awarder names                       |
+| `created_at`             | datetime  | When the star was awarded (RFC3339)            |
 
 ---
 
@@ -237,6 +241,82 @@ Returns all predefined star reasons with translations and usage counts.
 | `Translations` | map[string]string | Language code to translated text          |
 | `Count`        | int               | Number of times this reason has been used |
 | `Stars`        | int               | Default star count for this reason        |
+
+---
+
+### GET /api/rewards
+
+Returns all configured rewards with translations.
+
+**Response:**
+
+```json
+[
+  {
+    "ID": 1,
+    "Name": "Ice cream outing",
+    "Cost": 8,
+    "Icon": "🍦",
+    "Translations": {
+      "en": "Ice cream outing",
+      "zh-CN": "冰淇淋外出",
+      "zh-TW": "冰淇淋外出"
+    }
+  }
+]
+```
+
+| Field          | Type              | Description                     |
+|----------------|-------------------|---------------------------------|
+| `ID`           | int               | Reward ID                       |
+| `Name`         | string            | English name (backward compat)  |
+| `Cost`         | int               | Star cost to redeem             |
+| `Icon`         | string            | Emoji icon                      |
+| `Translations` | map[string]string | Language code to translated name |
+
+---
+
+### GET /api/redemptions
+
+Returns redemption history.
+
+**Query Parameters:**
+
+| Param  | Required | Description                          |
+|--------|----------|--------------------------------------|
+| `user` | No       | Filter by username                   |
+
+**Response:**
+
+```json
+[
+  {
+    "ID": 1,
+    "UserID": 3,
+    "Username": "theo",
+    "UsernameEN": "Theo",
+    "UsernameCN": "西奥",
+    "UsernameTW": "西奧",
+    "RewardName": "Ice cream outing",
+    "RewardNameEN": "Ice cream outing",
+    "RewardNameCN": "冰淇淋外出",
+    "RewardNameTW": "冰淇淋外出",
+    "Cost": 8,
+    "CreatedAt": "2025-01-15T14:00:00Z"
+  }
+]
+```
+
+| Field                | Type     | Description                              |
+|----------------------|----------|------------------------------------------|
+| `ID`                 | int      | Redemption record ID                     |
+| `UserID`             | int      | User who redeemed                        |
+| `Username`           | string   | Username                                 |
+| `UsernameEN/CN/TW`   | string   | Translated display names                 |
+| `RewardName`         | string   | English reward name (backward compat)    |
+| `RewardNameEN/CN/TW` | string   | Translated reward names                  |
+| `Cost`               | int      | Stars spent (snapshot at redemption time) |
+| `CreatedAt`          | datetime | When the redemption occurred (RFC3339)   |
 
 ---
 
