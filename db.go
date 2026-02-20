@@ -359,6 +359,25 @@ func seedRewards() error {
 	return nil
 }
 
+func addUser(username, password string, isAdmin bool) error {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec("INSERT INTO users (username, password_hash, is_admin) VALUES (?, ?, ?)",
+		username, string(hash), isAdmin)
+	return err
+}
+
+func deleteUser(id int) error {
+	db.Exec("DELETE FROM sessions WHERE user_id = ?", id)
+	db.Exec("DELETE FROM user_translations WHERE user_id = ?", id)
+	db.Exec("DELETE FROM redemptions WHERE user_id = ?", id)
+	db.Exec("DELETE FROM stars WHERE user_id = ?", id)
+	_, err := db.Exec("DELETE FROM users WHERE id = ?", id)
+	return err
+}
+
 func updatePassword(userID int, newHash string) error {
 	_, err := db.Exec("UPDATE users SET password_hash = ? WHERE id = ?", newHash, userID)
 	return err

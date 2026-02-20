@@ -71,6 +71,8 @@ func main() {
 	mux.HandleFunc("POST /admin/toggle-announce", authAdmin(handleToggleAnnounce))
 	mux.HandleFunc("PUT /admin/reason/{id}", authAdmin(handleUpdateReasonTranslation))
 	mux.HandleFunc("DELETE /admin/reason/{id}", authAdmin(handleDeleteReason))
+	mux.HandleFunc("POST /admin/user", authAdmin(handleAddUser))
+	mux.HandleFunc("DELETE /admin/user/{id}", authAdmin(handleDeleteUser))
 	mux.HandleFunc("PUT /admin/user/{id}", authAdmin(handleUpdateUserTranslation))
 	mux.HandleFunc("GET /admin/export", authAdmin(handleExport))
 	mux.HandleFunc("POST /admin/import", authAdmin(handleImport))

@@ -78,7 +78,10 @@ var translations = {
         export_data: "Export Data",
         import_data: "Import Data",
         import_export_hint: "Export creates a JSON backup. Import will replace all existing data.",
-        retroactive: "Retroactive"
+        retroactive: "Retroactive",
+        role: "Role",
+        add_user: "Add User",
+        confirm_delete_user: "Delete user \"{name}\"? All their stars, redemptions and data will be removed."
     },
     "zh-CN": {
         star_tracker: "⭐ 星星记录",
@@ -159,7 +162,10 @@ var translations = {
         export_data: "导出数据",
         import_data: "导入数据",
         import_export_hint: "导出会创建 JSON 备份。导入将替换所有现有数据。",
-        retroactive: "追溯修改"
+        retroactive: "追溯修改",
+        role: "角色",
+        add_user: "添加用户",
+        confirm_delete_user: "删除用户「{name}」？所有星星、兑换记录和数据都将被移除。"
     },
     "zh-TW": {
         star_tracker: "⭐ 星星記錄",
@@ -240,7 +246,10 @@ var translations = {
         export_data: "匯出資料",
         import_data: "匯入資料",
         import_export_hint: "匯出會建立 JSON 備份。匯入將替換所有現有資料。",
-        retroactive: "追溯修改"
+        retroactive: "追溯修改",
+        role: "角色",
+        add_user: "新增使用者",
+        confirm_delete_user: "刪除使用者「{name}」？所有星星、兌換記錄和資料都將被移除。"
     }
 };
 

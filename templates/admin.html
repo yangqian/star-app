@@ -166,7 +166,8 @@
                 <th>English</th>
                 <th>简体中文</th>
                 <th>繁體中文</th>
-                <th>Role</th>
+                <th data-i18n="role">Role</th>
+                <th data-i18n="actions">Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -177,10 +178,28 @@
                 <td class="editable-trans" onclick="editUserTrans({{.ID}}, 'zh-CN', this)">{{index .Translations "zh-CN"}}</td>
                 <td class="editable-trans" onclick="editUserTrans({{.ID}}, 'zh-TW', this)">{{index .Translations "zh-TW"}}</td>
                 <td>{{if .IsAdmin}}<span data-i18n="parents">Parents</span>{{else}}<span data-i18n="kids">Kids</span>{{end}}</td>
+                <td>
+                    <button class="btn-danger" onclick="deleteUserEntry({{.ID}}, '{{.Username}}')" data-i18n="delete">Delete</button>
+                </td>
             </tr>
             {{end}}
         </tbody>
     </table>
+    <h3 data-i18n="add_user">Add User</h3>
+    <form method="POST" action="/admin/user">
+        <div style="display:flex;gap:0.5rem;align-items:end;">
+            <div style="flex:1"><label data-i18n="username">Username</label><input type="text" name="username" data-i18n-placeholder="username" placeholder="Username" required></div>
+            <div style="flex:1"><label data-i18n="password">Password</label><input type="password" name="password" placeholder="••••••" required></div>
+            <div>
+                <label data-i18n="role">Role</label>
+                <select name="role">
+                    <option value="kid" data-i18n="kids">Kids</option>
+                    <option value="admin" data-i18n="parents">Parents</option>
+                </select>
+            </div>
+            <button type="submit" style="margin-bottom:0.5rem" data-i18n="add">Add</button>
+        </div>
+    </form>
 </section>
 
 <section>

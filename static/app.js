@@ -463,6 +463,17 @@ function deleteReasonEntry(id) {
         .then(function() { location.reload(); });
 }
 
+function deleteUserEntry(id, username) {
+    var dict = translations[currentLang] || translations.en;
+    var msg = (dict.confirm_delete_user || "Delete user \"{name}\"? All their stars, redemptions and data will be removed.").replace("{name}", username);
+    if (!confirm(msg)) return;
+    fetch("/admin/user/" + id, { method: "DELETE" })
+        .then(function(resp) {
+            if (!resp.ok) return resp.text().then(function(t) { alert(t); });
+            location.reload();
+        });
+}
+
 function undoStar(id) {
     if (!confirm("Remove this star?")) return;
     fetch("/star/" + id, { method: "DELETE" })

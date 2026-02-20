@@ -546,6 +546,42 @@ func handleDeleteReward(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func handleAddUser(w http.ResponseWriter, r *http.Request) {
+	username := r.FormValue("username")
+	password := r.FormValue("password")
+	role := r.FormValue("role")
+
+	if username == "" || password == "" {
+		http.Error(w, "username and password required", http.StatusBadRequest)
+		return
+	}
+
+	isAdmin := role == "admin"
+	if err := addUser(username, password, isAdmin); err != nil {
+		http.Error(w, "failed to add user: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/admin", http.StatusSeeOther)
+}
+
+func handleDeleteUser(w http.ResponseWriter, r *http.Request) {
+	user := getContextUser(r)
+	idStr := r.PathValue("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	if id == user.ID {
+		http.Error(w, "cannot delete your own account", http.StatusBadRequest)
+		return
+	}
+
+	deleteUser(id)
+	w.WriteHeader(http.StatusOK)
+}
+
 func handleAddStar(w http.ResponseWriter, r *http.Request) {
 	user := getContextUser(r)
 	username := r.FormValue("username")
