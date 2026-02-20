@@ -163,37 +163,48 @@ Returns star award history.
 
 ### POST /api/stars
 
-Award stars to a user.
+Award stars to a user. Supports both predefined reasons (by ID) and custom text reasons — consistent with the web UI.
 
 **Request Body (JSON):**
 
 ```json
 {
   "username": "theo",
+  "reason_id": 2,
   "reason": "Cleaned room",
   "stars": 2
 }
 ```
 
-| Field      | Type   | Required | Description                                         |
-|------------|--------|----------|-----------------------------------------------------|
-| `username` | string | Yes      | Recipient username                                  |
-| `reason`   | string | Yes      | Reason for the award                                |
-| `stars`    | int    | No       | Number of stars (default: 1, negative for penalties) |
+| Field       | Type    | Required | Description                                              |
+|-------------|---------|----------|----------------------------------------------------------|
+| `username`  | string  | Yes      | Recipient username                                       |
+| `reason_id` | int     | No       | ID of a predefined reason (uses its translations & default star count) |
+| `reason`    | string  | No*      | Custom reason text (*required if no `reason_id`)         |
+| `stars`     | int     | No       | Number of stars (default: reason's configured count, or 1; negative for penalties) |
+
+When `reason_id` is provided:
+- The reason's configured star count is used unless `stars` is explicitly set
+- Translations are linked automatically
+- HA announcements use the translated reason text
 
 **Response:**
 
 ```json
-{"status": "ok"}
+{
+  "status": "ok",
+  "counts": [{"Username": "theo", "CurrentStars": 17, ...}],
+  "starId": 42
+}
 ```
 
 **Errors:**
 
-| Status | Body                                    | Cause                       |
-|--------|-----------------------------------------|-----------------------------|
-| 400    | `{"error":"invalid JSON"}`              | Malformed request body      |
-| 400    | `{"error":"username and reason required"}` | Missing required fields  |
-| 400    | `{"error":"user not found: xyz"}`       | Unknown username            |
+| Status | Body                                              | Cause                       |
+|--------|---------------------------------------------------|-----------------------------|
+| 400    | `{"error":"invalid JSON"}`                        | Malformed request body      |
+| 400    | `{"error":"username and reason (or reason_id) required"}` | Missing required fields |
+| 400    | `{"error":"user not found: xyz"}`                 | Unknown username            |
 
 ---
 

@@ -728,6 +728,7 @@ func handleAPIGetStars(w http.ResponseWriter, r *http.Request) {
 func handleAPIAddStar(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Username string `json:"username"`
+		ReasonID *int   `json:"reason_id"`
 		Reason   string `json:"reason"`
 		Stars    int    `json:"stars"`
 	}
@@ -735,25 +736,29 @@ func handleAPIAddStar(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
-	if req.Username == "" || req.Reason == "" {
-		jsonError(w, "username and reason required", http.StatusBadRequest)
+	if req.Username == "" || (req.ReasonID == nil && req.Reason == "") {
+		jsonError(w, "username and reason (or reason_id) required", http.StatusBadRequest)
 		return
 	}
 
-	stars := req.Stars
-
-	_, err := addStarWithID(req.Username, nil, req.Reason, stars, 0)
+	starID, err := addStarWithID(req.Username, req.ReasonID, req.Reason, req.Stars, 0)
 	if err != nil {
 		jsonError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	actualStars := stars
+	actualStars := req.Stars
 	if actualStars == 0 {
 		actualStars = 1
 	}
-	announceStarIfEnabled(req.Username, nil, req.Reason, actualStars)
-	jsonResponse(w, map[string]string{"status": "ok"})
+	announceStarIfEnabled(req.Username, req.ReasonID, req.Reason, actualStars)
+
+	counts, _ := getUserStarCounts()
+	jsonResponse(w, map[string]interface{}{
+		"status": "ok",
+		"counts": counts,
+		"starId": starID,
+	})
 }
 
 func handleAPIGetUsers(w http.ResponseWriter, r *http.Request) {
