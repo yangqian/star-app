@@ -115,18 +115,98 @@ func initDB(dbPath string) error {
 	return runMigrations()
 }
 
+func columnExists(table, column string) bool {
+	var exists bool
+	db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('"+table+"') WHERE name=?", column).Scan(&exists)
+	return exists
+}
+
 func runMigrations() error {
-	// Add stars column to reasons table if it doesn't exist
-	var columnExists bool
-	err := db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('reasons') WHERE name='stars'").Scan(&columnExists)
-	if err == nil && !columnExists {
-		_, err = db.Exec("ALTER TABLE reasons ADD COLUMN stars INTEGER NOT NULL DEFAULT 1")
-		if err != nil {
-			return fmt.Errorf("failed to add stars column: %w", err)
+	// --- stars table migrations ---
+	// Add reason_id column (originally stars had "reason TEXT NOT NULL")
+	if !columnExists("stars", "reason_id") {
+		if _, err := db.Exec("ALTER TABLE stars ADD COLUMN reason_id INTEGER REFERENCES reasons(id)"); err != nil {
+			return fmt.Errorf("failed to add reason_id column to stars: %w", err)
+		}
+	}
+	// Add reason_text column
+	if !columnExists("stars", "reason_text") {
+		if _, err := db.Exec("ALTER TABLE stars ADD COLUMN reason_text TEXT"); err != nil {
+			return fmt.Errorf("failed to add reason_text column to stars: %w", err)
+		}
+		// Migrate data from old "reason" column if it exists
+		if columnExists("stars", "reason") {
+			db.Exec("UPDATE stars SET reason_text = reason WHERE reason_text IS NULL")
+		}
+	}
+	// Add stars (count per record) column
+	if !columnExists("stars", "stars") {
+		if _, err := db.Exec("ALTER TABLE stars ADD COLUMN stars INTEGER NOT NULL DEFAULT 1"); err != nil {
+			return fmt.Errorf("failed to add stars column to stars: %w", err)
 		}
 	}
 
-	// Create user_translations table if it doesn't exist
+	// --- reasons table migrations ---
+	// Add key column (originally reasons had "text TEXT UNIQUE NOT NULL")
+	if !columnExists("reasons", "key") {
+		if _, err := db.Exec("ALTER TABLE reasons ADD COLUMN key TEXT"); err != nil {
+			return fmt.Errorf("failed to add key column to reasons: %w", err)
+		}
+		// Migrate data from old "text" column if it exists
+		if columnExists("reasons", "text") {
+			rows, err := db.Query("SELECT id, text FROM reasons WHERE key IS NULL")
+			if err == nil {
+				defer rows.Close()
+				for rows.Next() {
+					var id int
+					var text string
+					rows.Scan(&id, &text)
+					db.Exec("UPDATE reasons SET key = ? WHERE id = ?", sanitizeKey(text), id)
+				}
+			}
+		}
+	}
+	// Add stars column to reasons
+	if !columnExists("reasons", "stars") {
+		if _, err := db.Exec("ALTER TABLE reasons ADD COLUMN stars INTEGER NOT NULL DEFAULT 1"); err != nil {
+			return fmt.Errorf("failed to add stars column to reasons: %w", err)
+		}
+	}
+	// Add created_at column to reasons
+	if !columnExists("reasons", "created_at") {
+		if _, err := db.Exec("ALTER TABLE reasons ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP"); err != nil {
+			return fmt.Errorf("failed to add created_at column to reasons: %w", err)
+		}
+	}
+
+	// --- reason_translations table ---
+	_, err := db.Exec(`CREATE TABLE IF NOT EXISTS reason_translations (
+		id INTEGER PRIMARY KEY,
+		reason_id INTEGER NOT NULL REFERENCES reasons(id) ON DELETE CASCADE,
+		lang TEXT NOT NULL,
+		text TEXT NOT NULL,
+		UNIQUE(reason_id, lang)
+	)`)
+	if err != nil {
+		return fmt.Errorf("failed to create reason_translations table: %w", err)
+	}
+	// Migrate old reason text to English translations if not already done
+	if columnExists("reasons", "text") {
+		rows, err := db.Query(`SELECT r.id, r.text FROM reasons r
+			WHERE r.text IS NOT NULL AND r.text != ''
+			AND NOT EXISTS (SELECT 1 FROM reason_translations rt WHERE rt.reason_id = r.id AND rt.lang = 'en')`)
+		if err == nil {
+			defer rows.Close()
+			for rows.Next() {
+				var id int
+				var text string
+				rows.Scan(&id, &text)
+				db.Exec("INSERT OR IGNORE INTO reason_translations (reason_id, lang, text) VALUES (?, 'en', ?)", id, text)
+			}
+		}
+	}
+
+	// --- user_translations table ---
 	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS user_translations (
 		id INTEGER PRIMARY KEY,
 		user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -138,41 +218,67 @@ func runMigrations() error {
 		return fmt.Errorf("failed to create user_translations table: %w", err)
 	}
 
-	// Migrate rewards table to use key + translations
-	var keyExists bool
-	err = db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('rewards') WHERE name='key'").Scan(&keyExists)
-	if err == nil && !keyExists {
-		// Create reward_translations table
-		_, err = db.Exec(`CREATE TABLE IF NOT EXISTS reward_translations (
-			id INTEGER PRIMARY KEY,
-			reward_id INTEGER NOT NULL REFERENCES rewards(id) ON DELETE CASCADE,
-			lang TEXT NOT NULL,
-			text TEXT NOT NULL,
-			UNIQUE(reward_id, lang)
-		)`)
-		if err != nil {
-			return fmt.Errorf("failed to create reward_translations table: %w", err)
+	// --- rewards table migrations ---
+	// Add icon column
+	if !columnExists("rewards", "icon") {
+		if _, err := db.Exec("ALTER TABLE rewards ADD COLUMN icon TEXT NOT NULL DEFAULT ''"); err != nil {
+			return fmt.Errorf("failed to add icon column to rewards: %w", err)
 		}
-
-		// Add key column to rewards
-		_, err = db.Exec("ALTER TABLE rewards ADD COLUMN key TEXT")
-		if err != nil {
+	}
+	// Add key column (originally rewards had "name TEXT UNIQUE NOT NULL")
+	if !columnExists("rewards", "key") {
+		if _, err := db.Exec("ALTER TABLE rewards ADD COLUMN key TEXT"); err != nil {
 			return fmt.Errorf("failed to add key column to rewards: %w", err)
 		}
+		// Migrate data from old "name" column if it exists
+		if columnExists("rewards", "name") {
+			rows, err := db.Query("SELECT id, name FROM rewards WHERE key IS NULL")
+			if err == nil {
+				defer rows.Close()
+				for rows.Next() {
+					var id int
+					var name string
+					rows.Scan(&id, &name)
+					db.Exec("UPDATE rewards SET key = ? WHERE id = ?", sanitizeKey(name), id)
+				}
+			}
+		}
+	}
 
-		// Migrate existing rewards: copy name to key and create English translation
-		rows, err := db.Query("SELECT id, name FROM rewards WHERE key IS NULL")
+	// --- reward_translations table ---
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS reward_translations (
+		id INTEGER PRIMARY KEY,
+		reward_id INTEGER NOT NULL REFERENCES rewards(id) ON DELETE CASCADE,
+		lang TEXT NOT NULL,
+		text TEXT NOT NULL,
+		UNIQUE(reward_id, lang)
+	)`)
+	if err != nil {
+		return fmt.Errorf("failed to create reward_translations table: %w", err)
+	}
+	// Migrate old reward name to English translations if not already done
+	if columnExists("rewards", "name") {
+		rows, err := db.Query(`SELECT r.id, r.name FROM rewards r
+			WHERE r.name IS NOT NULL AND r.name != ''
+			AND NOT EXISTS (SELECT 1 FROM reward_translations rt WHERE rt.reward_id = r.id AND rt.lang = 'en')`)
 		if err == nil {
 			defer rows.Close()
 			for rows.Next() {
 				var id int
 				var name string
 				rows.Scan(&id, &name)
-				key := sanitizeKey(name)
-				db.Exec("UPDATE rewards SET key = ? WHERE id = ?", key, id)
-				db.Exec("INSERT INTO reward_translations (reward_id, lang, text) VALUES (?, 'en', ?)", id, name)
+				db.Exec("INSERT OR IGNORE INTO reward_translations (reward_id, lang, text) VALUES (?, 'en', ?)", id, name)
 			}
 		}
+	}
+
+	// --- settings table ---
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS settings (
+		key TEXT PRIMARY KEY,
+		value TEXT NOT NULL DEFAULT ''
+	)`)
+	if err != nil {
+		return fmt.Errorf("failed to create settings table: %w", err)
 	}
 
 	return nil
@@ -481,7 +587,7 @@ func addStarWithID(username string, reasonID *int, reasonText string, stars int,
 		reasonID = existingID
 	} else {
 		// Create new reason with specified star count
-		key := sanitizeKey(reasonText)
+		key := uniqueKey(sanitizeKey(reasonText), "reasons", "key")
 		result, err := db.Exec("INSERT INTO reasons (key, stars) VALUES (?, ?)", key, stars)
 		if err != nil {
 			return 0, err
@@ -713,9 +819,28 @@ func getRewardsList() ([]Reward, error) {
 	return rewards, nil
 }
 
+func uniqueKey(baseKey, table, column string) string {
+	key := baseKey
+	for i := 2; ; i++ {
+		var count int
+		db.QueryRow("SELECT COUNT(*) FROM "+table+" WHERE "+column+" = ?", key).Scan(&count)
+		if count == 0 {
+			return key
+		}
+		key = fmt.Sprintf("%s_%d", baseKey, i)
+	}
+}
+
 func addReward(name string, cost int, icon string) error {
-	key := sanitizeKey(name)
-	result, err := db.Exec("INSERT INTO rewards (key, cost, icon) VALUES (?, ?, ?)", key, cost, icon)
+	key := uniqueKey(sanitizeKey(name), "rewards", "key")
+	var result sql.Result
+	var err error
+	// Migrated databases may still have the old "name" column with NOT NULL
+	if columnExists("rewards", "name") {
+		result, err = db.Exec("INSERT INTO rewards (name, key, cost, icon) VALUES (?, ?, ?, ?)", name, key, cost, icon)
+	} else {
+		result, err = db.Exec("INSERT INTO rewards (key, cost, icon) VALUES (?, ?, ?)", key, cost, icon)
+	}
 	if err != nil {
 		return err
 	}

@@ -483,7 +483,10 @@ func handleAddReward(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid reward", http.StatusBadRequest)
 		return
 	}
-	addReward(name, cost, icon)
+	if err := addReward(name, cost, icon); err != nil {
+		http.Error(w, "failed to add reward: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
 	http.Redirect(w, r, "/admin", http.StatusSeeOther)
 }
 
