@@ -141,8 +141,8 @@
             <input type="checkbox" name="ha_enabled" value="1" {{if eq .HAEnabled "1"}}checked{{end}}>
             <span data-i18n="ha_enabled_label">Enable announcements</span>
         </label>
-        <label data-i18n="ha_url_label">Home Assistant URL</label>
-        <input type="text" name="ha_url" value="{{.HAUrl}}" placeholder="https://home.xxx.xxx">
+        <label data-i18n="ha_url_label">Home Assistant TTS URL</label>
+        <input type="text" name="ha_url" value="{{.HAUrl}}" placeholder="https://home.xxx.xxx/api/services/tts/microsoft_say">
         <label data-i18n="ha_token_label">Long-Lived Access Token</label>
         <input type="password" name="ha_token" value="{{.HAToken}}" placeholder="eyJ...">
         <label data-i18n="ha_media_player_label">Media Player Entity</label>

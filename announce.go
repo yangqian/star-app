@@ -43,8 +43,6 @@ func announceStarIfEnabled(username string, reasonID *int, reasonText string, st
 
 	message := formatAnnounceMessage(lang, displayName, displayReason, stars, absStars)
 
-	haURL = strings.TrimRight(haURL, "/")
-
 	go func() {
 		payload := map[string]interface{}{
 			"entity_id": haEntity,
@@ -52,7 +50,7 @@ func announceStarIfEnabled(username string, reasonID *int, reasonText string, st
 		}
 		body, _ := json.Marshal(payload)
 
-		url := haURL + "/api/services/tts/microsoft_say"
+		url := strings.TrimRight(haURL, "/")
 		req, err := http.NewRequest("POST", url, bytes.NewReader(body))
 		if err != nil {
 			log.Printf("HA announce error: %v", err)
