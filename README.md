@@ -2,6 +2,16 @@
 
 A family star reward tracking app. Parents award stars to kids for good behavior, and kids redeem stars for rewards. Built with Go, SQLite, and server-rendered HTML templates.
 
+## Screenshots
+
+| Login | Dashboard |
+|-------|-----------|
+| ![Login](screenshots/login.png) | ![Dashboard](screenshots/dashboard.png) |
+
+| Dashboard (with data) | Admin Panel |
+|------------------------|-------------|
+| ![Dashboard with data](screenshots/dashboard-with-data.png) | ![Admin](screenshots/admin.png) |
+
 ## Features
 
 - Star awarding with configurable reasons and star counts (positive or negative)
