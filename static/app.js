@@ -426,7 +426,8 @@ function editReasonStars(reasonId, cell) {
     function save() {
         var newValue = parseInt(input.value, 10);
         if (!isNaN(newValue) && newValue !== 0 && newValue.toString() !== currentValue) {
-            var body = new URLSearchParams({stars: newValue});
+            var retro = document.getElementById('reasonRetroactive');
+            var body = new URLSearchParams({stars: newValue, retroactive: (retro && retro.checked) ? '1' : '0'});
             fetch("/admin/reason/" + reasonId, {
                 method: "PUT",
                 body: body
@@ -536,7 +537,8 @@ function editRewardCost(rewardId, cell) {
     function save() {
         var newValue = parseInt(input.value, 10);
         if (newValue >= 1 && newValue.toString() !== currentValue) {
-            var body = new URLSearchParams({cost: newValue});
+            var retro = document.getElementById('rewardRetroactive');
+            var body = new URLSearchParams({cost: newValue, retroactive: (retro && retro.checked) ? '1' : '0'});
             fetch("/admin/reward/" + rewardId, {
                 method: "PUT",
                 body: body

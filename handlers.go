@@ -281,7 +281,8 @@ func handleUpdateReasonTranslation(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "invalid stars value", http.StatusBadRequest)
 			return
 		}
-		updateReasonStars(id, stars)
+		retroactive := r.FormValue("retroactive") != "0"
+		updateReasonStars(id, stars, retroactive)
 	}
 
 	jsonResponse(w, map[string]string{"status": "ok"})
@@ -528,7 +529,8 @@ func handleUpdateRewardTranslation(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "invalid cost value", http.StatusBadRequest)
 			return
 		}
-		updateRewardCost(id, cost)
+		retroactive := r.FormValue("retroactive") != "0"
+		updateRewardCost(id, cost, retroactive)
 	}
 
 	jsonResponse(w, map[string]string{"status": "ok"})

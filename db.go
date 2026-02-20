@@ -272,6 +272,14 @@ func runMigrations() error {
 		}
 	}
 
+	// --- redemptions table migrations ---
+	// Add cost column to snapshot cost at redemption time
+	if !columnExists("redemptions", "cost") {
+		if _, err := db.Exec("ALTER TABLE redemptions ADD COLUMN cost INTEGER"); err != nil {
+			return fmt.Errorf("failed to add cost column to redemptions: %w", err)
+		}
+	}
+
 	// --- settings table ---
 	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS settings (
 		key TEXT PRIMARY KEY,
@@ -453,7 +461,7 @@ type UserStarCount struct {
 func getUserStarCounts() ([]UserStarCount, error) {
 	rows, err := db.Query(`
 		SELECT u.id, u.username, u.is_admin, COALESCE(SUM(s.stars), 0) as star_count,
-			COALESCE(SUM(s.stars), 0) - COALESCE((SELECT SUM(rw.cost) FROM redemptions rd JOIN rewards rw ON rd.reward_id = rw.id WHERE rd.user_id = u.id), 0) as current_stars
+			COALESCE(SUM(s.stars), 0) - COALESCE((SELECT SUM(COALESCE(rd.cost, rw.cost)) FROM redemptions rd JOIN rewards rw ON rd.reward_id = rw.id WHERE rd.user_id = u.id), 0) as current_stars
 		FROM users u LEFT JOIN stars s ON u.id = s.user_id
 		GROUP BY u.id ORDER BY star_count DESC`)
 	if err != nil {
@@ -633,14 +641,16 @@ func updateReasonTranslation(reasonID int, lang, text string) error {
 	return err
 }
 
-func updateReasonStars(reasonID int, stars int) error {
+func updateReasonStars(reasonID int, stars int, retroactive bool) error {
 	// Update the reason's default star count
 	_, err := db.Exec("UPDATE reasons SET stars = ? WHERE id = ?", stars, reasonID)
 	if err != nil {
 		return err
 	}
-	// Retroactively update all existing stars with this reason
-	_, err = db.Exec("UPDATE stars SET stars = ? WHERE reason_id = ?", stars, reasonID)
+	if retroactive {
+		// Retroactively update all existing stars with this reason
+		_, err = db.Exec("UPDATE stars SET stars = ? WHERE reason_id = ?", stars, reasonID)
+	}
 	return err
 }
 
@@ -871,9 +881,13 @@ func updateRewardTranslation(rewardID int, lang, text string) error {
 	return err
 }
 
-func updateRewardCost(rewardID int, cost int) error {
+func updateRewardCost(rewardID int, cost int, retroactive bool) error {
 	if cost < 1 {
 		cost = 1
+	}
+	if !retroactive {
+		// Snapshot current cost into existing redemptions before changing
+		db.Exec("UPDATE redemptions SET cost = (SELECT cost FROM rewards WHERE id = ?) WHERE reward_id = ? AND cost IS NULL", rewardID, rewardID)
 	}
 	_, err := db.Exec("UPDATE rewards SET cost = ? WHERE id = ?", cost, rewardID)
 	return err
@@ -926,13 +940,13 @@ func getRewardByID(id int) (*Reward, error) {
 func getUserCurrentStars(userID int) (int, error) {
 	var current int
 	err := db.QueryRow(`
-		SELECT COALESCE(SUM(s.stars), 0) - COALESCE((SELECT SUM(rw.cost) FROM redemptions rd JOIN rewards rw ON rd.reward_id = rw.id WHERE rd.user_id = ?), 0)
+		SELECT COALESCE(SUM(s.stars), 0) - COALESCE((SELECT SUM(COALESCE(rd.cost, rw.cost)) FROM redemptions rd JOIN rewards rw ON rd.reward_id = rw.id WHERE rd.user_id = ?), 0)
 		FROM stars s WHERE s.user_id = ?`, userID, userID).Scan(&current)
 	return current, err
 }
 
 func redeemReward(userID, rewardID int) error {
-	_, err := db.Exec("INSERT INTO redemptions (user_id, reward_id) VALUES (?, ?)", userID, rewardID)
+	_, err := db.Exec("INSERT INTO redemptions (user_id, reward_id, cost) SELECT ?, ?, cost FROM rewards WHERE id = ?", userID, rewardID, rewardID)
 	return err
 }
 
@@ -1116,7 +1130,7 @@ func importAllData(data map[string]interface{}) error {
 }
 
 func getRecentRedemptions(limit int, filterUserID int) ([]Redemption, error) {
-	query := `SELECT rd.id, rd.user_id, u.username, rd.reward_id, rw.cost, rd.created_at
+	query := `SELECT rd.id, rd.user_id, u.username, rd.reward_id, COALESCE(rd.cost, rw.cost), rd.created_at
 		FROM redemptions rd
 		JOIN users u ON rd.user_id = u.id
 		JOIN rewards rw ON rd.reward_id = rw.id`

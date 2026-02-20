@@ -77,7 +77,8 @@ var translations = {
         import_export: "Import / Export",
         export_data: "Export Data",
         import_data: "Import Data",
-        import_export_hint: "Export creates a JSON backup. Import will replace all existing data."
+        import_export_hint: "Export creates a JSON backup. Import will replace all existing data.",
+        retroactive: "Retroactive"
     },
     "zh-CN": {
         star_tracker: "⭐ 星星记录",
@@ -157,7 +158,8 @@ var translations = {
         import_export: "导入 / 导出",
         export_data: "导出数据",
         import_data: "导入数据",
-        import_export_hint: "导出会创建 JSON 备份。导入将替换所有现有数据。"
+        import_export_hint: "导出会创建 JSON 备份。导入将替换所有现有数据。",
+        retroactive: "追溯修改"
     },
     "zh-TW": {
         star_tracker: "⭐ 星星記錄",
@@ -237,7 +239,8 @@ var translations = {
         import_export: "匯入 / 匯出",
         export_data: "匯出資料",
         import_data: "匯入資料",
-        import_export_hint: "匯出會建立 JSON 備份。匯入將替換所有現有資料。"
+        import_export_hint: "匯出會建立 JSON 備份。匯入將替換所有現有資料。",
+        retroactive: "追溯修改"
     }
 };
 
