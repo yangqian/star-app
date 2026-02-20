@@ -142,6 +142,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
+		MaxAge:   10 * 365 * 24 * 60 * 60, // ~10 years
 	})
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
