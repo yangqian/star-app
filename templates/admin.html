@@ -51,7 +51,7 @@
                         </select>
                     </td>
                     <td><input type="text" name="reason" data-i18n-placeholder="what_did_they_do" placeholder="What did they do?" required style="width:100%"></td>
-                    <td><input type="number" name="stars" min="1" value="1" style="width:4rem;text-align:center"></td>
+                    <td><input type="number" name="stars" value="1" style="width:4rem;text-align:center"></td>
                     <td></td>
                     <td><button type="submit" data-i18n="award">Award</button></td>
                 </form>
@@ -147,6 +147,12 @@
         <input type="password" name="ha_token" value="{{.HAToken}}" placeholder="eyJ...">
         <label data-i18n="ha_media_player_label">Media Player Entity</label>
         <input type="text" name="ha_media_player" value="{{.HAMediaPlayer}}" placeholder="media_player.home_2">
+        <label data-i18n="ha_lang_label">Announce Language</label>
+        <select name="ha_lang">
+            <option value="en" {{if or (eq .HALang "en") (eq .HALang "")}}selected{{end}}>English</option>
+            <option value="zh-CN" {{if eq .HALang "zh-CN"}}selected{{end}}>简体中文</option>
+            <option value="zh-TW" {{if eq .HALang "zh-TW"}}selected{{end}}>繁體中文</option>
+        </select>
         <button type="submit" data-i18n="save">Save</button>
     </form>
 </section>

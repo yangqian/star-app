@@ -172,7 +172,7 @@ function submitStar(reason, reasonId, stars) {
             body.append('reason_id', reasonId);
         }
         body.append('reason', reason);
-        if (stars && stars > 0) {
+        if (stars && parseInt(stars) !== 0) {
             body.append('stars', stars);
         }
 
@@ -419,14 +419,13 @@ function editReasonStars(reasonId, cell) {
     var currentValue = cell.textContent;
     var input = document.createElement('input');
     input.type = 'number';
-    input.min = '1';
     input.value = currentValue;
     input.style.width = '4rem';
     input.style.textAlign = 'center';
 
     function save() {
         var newValue = parseInt(input.value, 10);
-        if (newValue >= 1 && newValue.toString() !== currentValue) {
+        if (!isNaN(newValue) && newValue !== 0 && newValue.toString() !== currentValue) {
             var body = new URLSearchParams({stars: newValue});
             fetch("/admin/reason/" + reasonId, {
                 method: "PUT",

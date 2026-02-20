@@ -186,9 +186,9 @@ func handleQuickStar(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	stars := 1
+	stars := 0
 	if starsStr != "" {
-		if s, err := strconv.Atoi(starsStr); err == nil && s > 0 {
+		if s, err := strconv.Atoi(starsStr); err == nil {
 			stars = s
 		}
 	}
@@ -199,12 +199,12 @@ func handleQuickStar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get reason text for announcement
-	displayText := reasonText
-	if reasonID != nil {
-		displayText = getReasonText(reasonID, reasonText, "en")
+	// Resolve actual star count for announcement
+	actualStars := stars
+	if actualStars == 0 {
+		actualStars = 1
 	}
-	announceStarIfEnabled(username, displayText)
+	announceStarIfEnabled(username, reasonID, reasonText, actualStars)
 
 	if r.Header.Get("Accept") == "application/json" {
 		counts, _ := getUserStarCounts()
@@ -277,7 +277,7 @@ func handleUpdateReasonTranslation(w http.ResponseWriter, r *http.Request) {
 
 	if starsStr != "" {
 		stars, err := strconv.Atoi(starsStr)
-		if err != nil || stars < 1 {
+		if err != nil {
 			http.Error(w, "invalid stars value", http.StatusBadRequest)
 			return
 		}
@@ -470,6 +470,7 @@ func handleAdmin(w http.ResponseWriter, r *http.Request) {
 		"HAUrl":         getSetting("ha_url"),
 		"HAToken":       getSetting("ha_token"),
 		"HAMediaPlayer": getSetting("ha_media_player"),
+		"HALang":        getSetting("ha_lang"),
 	}
 	templates["admin.html"].ExecuteTemplate(w, "admin.html", data)
 }
@@ -551,9 +552,9 @@ func handleAddStar(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stars := 1
+	stars := 0
 	if starsStr != "" {
-		if s, err := strconv.Atoi(starsStr); err == nil && s > 0 {
+		if s, err := strconv.Atoi(starsStr); err == nil {
 			stars = s
 		}
 	}
@@ -563,7 +564,12 @@ func handleAddStar(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	announceStarIfEnabled(username, reason)
+
+	actualStars := stars
+	if actualStars == 0 {
+		actualStars = 1
+	}
+	announceStarIfEnabled(username, nil, reason, actualStars)
 
 	http.Redirect(w, r, "/admin", http.StatusSeeOther)
 }
@@ -614,6 +620,7 @@ func handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	setSetting("ha_url", r.FormValue("ha_url"))
 	setSetting("ha_token", r.FormValue("ha_token"))
 	setSetting("ha_media_player", r.FormValue("ha_media_player"))
+	setSetting("ha_lang", r.FormValue("ha_lang"))
 	http.Redirect(w, r, "/admin", http.StatusSeeOther)
 }
 
@@ -693,16 +700,18 @@ func handleAPIAddStar(w http.ResponseWriter, r *http.Request) {
 	}
 
 	stars := req.Stars
-	if stars < 1 {
-		stars = 1
-	}
 
 	_, err := addStarWithID(req.Username, nil, req.Reason, stars, 0)
 	if err != nil {
 		jsonError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	announceStarIfEnabled(req.Username, req.Reason)
+
+	actualStars := stars
+	if actualStars == 0 {
+		actualStars = 1
+	}
+	announceStarIfEnabled(req.Username, nil, req.Reason, actualStars)
 	jsonResponse(w, map[string]string{"status": "ok"})
 }
 

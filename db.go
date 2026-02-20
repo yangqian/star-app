@@ -445,10 +445,10 @@ func addStarWithID(username string, reasonID *int, reasonText string, stars int,
 	// If reason ID provided, use it directly
 	if reasonID != nil && *reasonID > 0 {
 		// Get the star count from the reason if not explicitly provided
-		if stars < 1 {
+		if stars == 0 {
 			var reasonStars int
 			err := db.QueryRow("SELECT stars FROM reasons WHERE id = ?", reasonID).Scan(&reasonStars)
-			if err == nil && reasonStars > 0 {
+			if err == nil && reasonStars != 0 {
 				stars = reasonStars
 			} else {
 				stars = 1
@@ -462,8 +462,8 @@ func addStarWithID(username string, reasonID *int, reasonText string, stars int,
 		return result.LastInsertId()
 	}
 
-	// Ensure stars is at least 1 for custom reasons
-	if stars < 1 {
+	// Default to 1 star for custom reasons if not specified
+	if stars == 0 {
 		stars = 1
 	}
 
@@ -528,9 +528,6 @@ func updateReasonTranslation(reasonID int, lang, text string) error {
 }
 
 func updateReasonStars(reasonID int, stars int) error {
-	if stars < 1 {
-		stars = 1
-	}
 	// Update the reason's default star count
 	_, err := db.Exec("UPDATE reasons SET stars = ? WHERE id = ?", stars, reasonID)
 	if err != nil {
@@ -900,6 +897,7 @@ func exportAllData() (map[string]interface{}, error) {
 		"ha_url":          getSetting("ha_url"),
 		"ha_token":        getSetting("ha_token"),
 		"ha_media_player": getSetting("ha_media_player"),
+		"ha_lang":         getSetting("ha_lang"),
 	}
 	data["settings"] = settings
 
