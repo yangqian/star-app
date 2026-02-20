@@ -2,3 +2,4 @@ star-app
 star-app-arm64
 *.db
 Makefile
+.claude/
