@@ -74,12 +74,12 @@ function syncFilterButtons() {
     });
     var sorted = selectedUsers.slice().sort();
     document.querySelectorAll('.filter-btn').forEach(function(b) {
-        var label = b.textContent.toLowerCase();
+        var filter = b.dataset.filter;
         var active = false;
-        if (label === 'all') active = arrEq(sorted, all.slice().sort());
-        else if (label === 'kids') active = arrEq(sorted, kids.slice().sort());
-        else if (label === 'parents') active = arrEq(sorted, parents.slice().sort());
-        else active = selectedUsers.length === 1 && selectedUsers[0].toLowerCase() === label;
+        if (filter === 'all') active = arrEq(sorted, all.slice().sort());
+        else if (filter === 'kids') active = arrEq(sorted, kids.slice().sort());
+        else if (filter === 'parents') active = arrEq(sorted, parents.slice().sort());
+        else active = selectedUsers.length === 1 && selectedUsers[0] === filter;
         b.classList.toggle('active', active);
     });
 }
@@ -605,15 +605,14 @@ function toggleAnnounce() {
     });
 }
 
-// Auto-select self for non-admin users on page load
+// Auto-select self for non-admin users on page load; sync UI for all
 document.addEventListener('DOMContentLoaded', function() {
     var actionBar = document.getElementById('actionBar');
-    // If no action bar, user is not admin - select self by default
     if (!actionBar) {
         var selfCard = document.querySelector('.member-card[data-self="true"]');
         if (selfCard) {
             selectedUsers = [selfCard.dataset.username];
-            updateSelection();
         }
     }
+    updateSelection();
 });

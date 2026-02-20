@@ -14,12 +14,12 @@
     <button class="mode-btn" data-mode="multiple" onclick="setSelectionMode('multiple')" data-i18n="mode_multiple">Multi</button>
 </div>
 <div class="filter-selector">
-    <button class="filter-btn active" onclick="filterCards('all')" data-i18n="all">All</button>
-    <button class="filter-btn" onclick="filterCards('kids')" data-i18n="kids">Kids</button>
-    <button class="filter-btn" onclick="filterCards('parents')" data-i18n="parents">Parents</button>
+    <button class="filter-btn" data-filter="all" onclick="filterCards('all')" data-i18n="all">All</button>
+    <button class="filter-btn" data-filter="kids" onclick="filterCards('kids')" data-i18n="kids">Kids</button>
+    <button class="filter-btn" data-filter="parents" onclick="filterCards('parents')" data-i18n="parents">Parents</button>
     <span class="filter-separator"></span>
     {{range .StarCounts}}
-    <button class="filter-btn user-name" data-en="{{.DisplayNameEN}}" data-zh-cn="{{.DisplayNameCN}}" data-zh-tw="{{.DisplayNameTW}}" onclick="filterCards('{{.Username}}')">{{.DisplayNameEN}}</button>
+    <button class="filter-btn user-name" data-filter="{{.Username}}" data-en="{{.DisplayNameEN}}" data-zh-cn="{{.DisplayNameCN}}" data-zh-tw="{{.DisplayNameTW}}" onclick="filterCards('{{.Username}}')">{{.DisplayNameEN}}</button>
     {{end}}
 </div>
 </div>
