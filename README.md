@@ -8,9 +8,9 @@ A family star reward tracking app. Parents award stars to kids for good behavior
 |-------|-----------|
 | ![Login](screenshots/login.png) | ![Dashboard](screenshots/dashboard.png) |
 
-| Dashboard (with data) | Admin Panel |
-|------------------------|-------------|
-| ![Dashboard with data](screenshots/dashboard-with-data.png) | ![Admin](screenshots/admin.png) |
+| Reward Translations | User & Reason Translations |
+|---------------------|---------------------------|
+| ![Rewards](screenshots/admin-rewards.png) | ![Users & Reasons](screenshots/admin-reasons.png) |
 
 ## Features
 

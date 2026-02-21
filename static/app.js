@@ -607,6 +607,8 @@ function toggleAnnounce() {
 
 // Auto-select self for non-admin users on page load; sync UI for all
 document.addEventListener('DOMContentLoaded', function() {
+    // Only run selection logic on the dashboard (where member cards exist)
+    if (!document.querySelector('.member-card')) return;
     var actionBar = document.getElementById('actionBar');
     if (!actionBar) {
         var selfCard = document.querySelector('.member-card[data-self="true"]');
