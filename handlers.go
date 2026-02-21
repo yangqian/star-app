@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"net/http"
 	"strconv"
 	"time"
@@ -24,6 +25,8 @@ func handleDashboard(w http.ResponseWriter, r *http.Request) {
 	counts, _ := getUserStarCounts()
 	rewards, _ := getRewardsList()
 	reasons, _ := getReasons()
+	userReasonCounts, _ := getUserReasonCounts()
+	userReasonCountsJSON, _ := json.Marshal(userReasonCounts)
 
 	// Kids only see their own data; admins see everything
 	var stars []Star
@@ -103,13 +106,14 @@ func handleDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := map[string]interface{}{
-		"User":        user,
-		"StarCounts":  counts,
-		"Stars":       consolidated,
-		"Rewards":     rewards,
-		"Redemptions": redemptions,
-		"Reasons":     reasons,
-		"HAEnabled":   getSetting("ha_enabled"),
+		"User":             user,
+		"StarCounts":       counts,
+		"Stars":            consolidated,
+		"Rewards":          rewards,
+		"Redemptions":      redemptions,
+		"Reasons":          reasons,
+		"HAEnabled":        getSetting("ha_enabled"),
+		"UserReasonCounts": template.JS(userReasonCountsJSON),
 	}
 	templates["dashboard.html"].ExecuteTemplate(w, "dashboard.html", data)
 }
@@ -247,6 +251,7 @@ func handleRedeem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	redeemReward(user.ID, reward.ID)
+	announceRedemptionIfEnabled(username, reward.ID, user.IsAdmin)
 
 	if r.Header.Get("Accept") == "application/json" {
 		counts, _ := getUserStarCounts()
@@ -484,7 +489,8 @@ func handleAddReward(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid reward", http.StatusBadRequest)
 		return
 	}
-	if err := addReward(name, cost, icon); err != nil {
+	adultOnly := r.FormValue("adult_only") == "1"
+	if err := addReward(name, cost, icon, adultOnly); err != nil {
 		http.Error(w, "failed to add reward: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -518,6 +524,7 @@ func handleUpdateRewardTranslation(w http.ResponseWriter, r *http.Request) {
 	lang := r.FormValue("lang")
 	text := r.FormValue("text")
 	costStr := r.FormValue("cost")
+	adultOnlyStr := r.FormValue("adult_only")
 
 	if lang != "" && text != "" {
 		updateRewardTranslation(id, lang, text)
@@ -531,6 +538,10 @@ func handleUpdateRewardTranslation(w http.ResponseWriter, r *http.Request) {
 		}
 		retroactive := r.FormValue("retroactive") != "0"
 		updateRewardCost(id, cost, retroactive)
+	}
+
+	if adultOnlyStr != "" {
+		updateRewardAdultOnly(id, adultOnlyStr == "1")
 	}
 
 	jsonResponse(w, map[string]string{"status": "ok"})

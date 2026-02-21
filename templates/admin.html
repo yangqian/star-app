@@ -71,6 +71,7 @@
                 <th>简体中文</th>
                 <th>繁體中文</th>
                 <th data-i18n="stars">Stars</th>
+                <th data-i18n="adult_only">Adult</th>
                 <th data-i18n="actions">Actions</th>
             </tr>
         </thead>
@@ -82,12 +83,13 @@
                 <td class="editable-trans" onclick="editRewardTrans({{.ID}}, 'zh-CN', this)">{{index .Translations "zh-CN"}}</td>
                 <td class="editable-trans" onclick="editRewardTrans({{.ID}}, 'zh-TW', this)">{{index .Translations "zh-TW"}}</td>
                 <td class="editable-stars" onclick="editRewardCost({{.ID}}, this)" style="text-align:center;cursor:pointer;padding:0.5rem" title="Click to edit">{{.Cost}}</td>
+                <td style="text-align:center"><input type="checkbox" {{if .ForAdults}}checked{{end}} onchange="toggleAdultOnly({{.ID}}, this.checked)"></td>
                 <td>
                     <button class="btn-danger" onclick="deleteReward({{.ID}})" data-i18n="delete">Delete</button>
                 </td>
             </tr>
             {{else}}
-            <tr><td colspan="6" data-i18n="no_rewards">No rewards configured</td></tr>
+            <tr><td colspan="7" data-i18n="no_rewards">No rewards configured</td></tr>
             {{end}}
         </tbody>
     </table>
@@ -97,6 +99,7 @@
             <div><label data-i18n="icon">Icon</label><input type="text" name="icon" placeholder="🎁" style="width:3rem;text-align:center"></div>
             <div style="flex:1"><label data-i18n="name">Name</label><input type="text" name="name" data-i18n-placeholder="reward_name" placeholder="Reward name" required></div>
             <div><label data-i18n="stars">Stars</label><input type="number" name="cost" placeholder="5" min="1" required style="width:5rem"></div>
+            <div style="display:flex;align-items:center;gap:0.25rem;margin-bottom:0.5rem"><input type="checkbox" name="adult_only" value="1" id="addRewardAdultOnly"><label for="addRewardAdultOnly" data-i18n="adult_only">Adult</label></div>
             <button type="submit" style="margin-bottom:0.5rem" data-i18n="add">Add</button>
         </div>
     </form>

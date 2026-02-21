@@ -272,6 +272,13 @@ func runMigrations() error {
 		}
 	}
 
+	// Add adult_only column to rewards
+	if !columnExists("rewards", "adult_only") {
+		if _, err := db.Exec("ALTER TABLE rewards ADD COLUMN adult_only BOOLEAN DEFAULT FALSE"); err != nil {
+			return fmt.Errorf("failed to add adult_only column to rewards: %w", err)
+		}
+	}
+
 	// --- redemptions table migrations ---
 	// Add cost column to snapshot cost at redemption time
 	if !columnExists("redemptions", "cost") {
@@ -468,13 +475,14 @@ func getUserText(userID int, lang string) string {
 }
 
 type UserStarCount struct {
-	Username     string
+	UserID        int
+	Username      string
 	DisplayNameEN string
 	DisplayNameCN string
 	DisplayNameTW string
-	StarCount    int
-	CurrentStars int
-	IsAdmin      bool
+	StarCount     int
+	CurrentStars  int
+	IsAdmin       bool
 }
 
 func getUserStarCounts() ([]UserStarCount, error) {
@@ -491,17 +499,36 @@ func getUserStarCounts() ([]UserStarCount, error) {
 	var results []UserStarCount
 	for rows.Next() {
 		var r UserStarCount
-		var userID int
-		rows.Scan(&userID, &r.Username, &r.IsAdmin, &r.StarCount, &r.CurrentStars)
+		rows.Scan(&r.UserID, &r.Username, &r.IsAdmin, &r.StarCount, &r.CurrentStars)
 
 		// Get all translations for this user
-		r.DisplayNameEN = getUserText(userID, "en")
-		r.DisplayNameCN = getUserText(userID, "zh-CN")
-		r.DisplayNameTW = getUserText(userID, "zh-TW")
+		r.DisplayNameEN = getUserText(r.UserID, "en")
+		r.DisplayNameCN = getUserText(r.UserID, "zh-CN")
+		r.DisplayNameTW = getUserText(r.UserID, "zh-TW")
 
 		results = append(results, r)
 	}
 	return results, nil
+}
+
+// getUserReasonCounts returns map[userID]map[reasonID]count
+func getUserReasonCounts() (map[int]map[int]int, error) {
+	rows, err := db.Query(`SELECT user_id, reason_id, COUNT(*) FROM stars WHERE reason_id IS NOT NULL GROUP BY user_id, reason_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[int]map[int]int)
+	for rows.Next() {
+		var userID, reasonID, count int
+		rows.Scan(&userID, &reasonID, &count)
+		if result[userID] == nil {
+			result[userID] = make(map[int]int)
+		}
+		result[userID][reasonID] = count
+	}
+	return result, nil
 }
 
 func getStars(filterUsername string) ([]Star, error) {
@@ -819,7 +846,7 @@ func deleteSession(token string) error {
 }
 
 func getRewardsList() ([]Reward, error) {
-	rows, err := db.Query("SELECT id, cost, icon FROM rewards ORDER BY cost ASC")
+	rows, err := db.Query("SELECT id, cost, icon, COALESCE(adult_only, 0) FROM rewards ORDER BY cost ASC")
 	if err != nil {
 		return nil, err
 	}
@@ -829,7 +856,7 @@ func getRewardsList() ([]Reward, error) {
 	for rows.Next() {
 		var r Reward
 		r.Translations = make(map[string]string)
-		rows.Scan(&r.ID, &r.Cost, &r.Icon)
+		rows.Scan(&r.ID, &r.Cost, &r.Icon, &r.ForAdults)
 
 		// Load all translations for this reward
 		tRows, _ := db.Query("SELECT lang, text FROM reward_translations WHERE reward_id = ?", r.ID)
@@ -860,15 +887,15 @@ func uniqueKey(baseKey, table, column string) string {
 	}
 }
 
-func addReward(name string, cost int, icon string) error {
+func addReward(name string, cost int, icon string, adultOnly bool) error {
 	key := uniqueKey(sanitizeKey(name), "rewards", "key")
 	var result sql.Result
 	var err error
 	// Migrated databases may still have the old "name" column with NOT NULL
 	if columnExists("rewards", "name") {
-		result, err = db.Exec("INSERT INTO rewards (name, key, cost, icon) VALUES (?, ?, ?, ?)", name, key, cost, icon)
+		result, err = db.Exec("INSERT INTO rewards (name, key, cost, icon, adult_only) VALUES (?, ?, ?, ?, ?)", name, key, cost, icon, adultOnly)
 	} else {
-		result, err = db.Exec("INSERT INTO rewards (key, cost, icon) VALUES (?, ?, ?)", key, cost, icon)
+		result, err = db.Exec("INSERT INTO rewards (key, cost, icon, adult_only) VALUES (?, ?, ?, ?)", key, cost, icon, adultOnly)
 	}
 	if err != nil {
 		return err
@@ -927,6 +954,11 @@ func getRewardText(rewardID int, lang string) string {
 	return ""
 }
 
+func updateRewardAdultOnly(rewardID int, adultOnly bool) error {
+	_, err := db.Exec("UPDATE rewards SET adult_only = ? WHERE id = ?", adultOnly, rewardID)
+	return err
+}
+
 func deleteRewardByID(id int) error {
 	_, err := db.Exec("DELETE FROM rewards WHERE id = ?", id)
 	return err
@@ -935,8 +967,8 @@ func deleteRewardByID(id int) error {
 func getRewardByID(id int) (*Reward, error) {
 	r := &Reward{}
 	r.Translations = make(map[string]string)
-	err := db.QueryRow("SELECT id, cost, icon FROM rewards WHERE id = ?", id).
-		Scan(&r.ID, &r.Cost, &r.Icon)
+	err := db.QueryRow("SELECT id, cost, icon, COALESCE(adult_only, 0) FROM rewards WHERE id = ?", id).
+		Scan(&r.ID, &r.Cost, &r.Icon, &r.ForAdults)
 	if err != nil {
 		return nil, err
 	}
@@ -1031,6 +1063,7 @@ func exportAllData() (map[string]interface{}, error) {
 			"key":          r.Name,
 			"cost":         r.Cost,
 			"icon":         r.Icon,
+			"adult_only":   r.ForAdults,
 			"translations": r.Translations,
 		})
 	}
@@ -1102,7 +1135,11 @@ func importAllData(data map[string]interface{}) error {
 			key := r["key"].(string)
 			cost := int(r["cost"].(float64))
 			icon := r["icon"].(string)
-			result, _ := db.Exec("INSERT INTO rewards (key, cost, icon) VALUES (?, ?, ?)", key, cost, icon)
+			adultOnly := false
+			if ao, ok := r["adult_only"].(bool); ok {
+				adultOnly = ao
+			}
+			result, _ := db.Exec("INSERT INTO rewards (key, cost, icon, adult_only) VALUES (?, ?, ?, ?)", key, cost, icon, adultOnly)
 			id, _ := result.LastInsertId()
 
 			// Import translations

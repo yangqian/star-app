@@ -81,7 +81,8 @@ var translations = {
         retroactive: "Retroactive",
         role: "Role",
         add_user: "Add User",
-        confirm_delete_user: "Delete user \"{name}\"? All their stars, redemptions and data will be removed."
+        confirm_delete_user: "Delete user \"{name}\"? All their stars, redemptions and data will be removed.",
+        adult_only: "Adult"
     },
     "zh-CN": {
         star_tracker: "⭐ 星星记录",
@@ -165,7 +166,8 @@ var translations = {
         retroactive: "追溯修改",
         role: "角色",
         add_user: "添加用户",
-        confirm_delete_user: "删除用户「{name}」？所有星星、兑换记录和数据都将被移除。"
+        confirm_delete_user: "删除用户「{name}」？所有星星、兑换记录和数据都将被移除。",
+        adult_only: "仅成人"
     },
     "zh-TW": {
         star_tracker: "⭐ 星星記錄",
@@ -249,7 +251,8 @@ var translations = {
         retroactive: "追溯修改",
         role: "角色",
         add_user: "新增使用者",
-        confirm_delete_user: "刪除使用者「{name}」？所有星星、兌換記錄和資料都將被移除。"
+        confirm_delete_user: "刪除使用者「{name}」？所有星星、兌換記錄和資料都將被移除。",
+        adult_only: "僅成人"
     }
 };
 

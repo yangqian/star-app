@@ -54,6 +54,7 @@ type Reward struct {
 	Name         string
 	Cost         int
 	Icon         string
+	ForAdults    bool
 	Translations map[string]string
 }
 

@@ -26,7 +26,7 @@
 
 <div class="star-counts">
     {{range .StarCounts}}
-    <div class="member-card" data-username="{{.Username}}" data-role="{{if .IsAdmin}}parent{{else}}kid{{end}}" data-self="{{if eq .Username $.User.Username}}true{{else}}false{{end}}" onclick="selectUser('{{.Username}}')" title="Click to select">
+    <div class="member-card" data-username="{{.Username}}" data-userid="{{.UserID}}" data-role="{{if .IsAdmin}}parent{{else}}kid{{end}}" data-self="{{if eq .Username $.User.Username}}true{{else}}false{{end}}" onclick="selectUser('{{.Username}}')" title="Click to select">
         <h2 class="user-name" data-en="{{.DisplayNameEN}}" data-zh-cn="{{.DisplayNameCN}}" data-zh-tw="{{.DisplayNameTW}}">{{.DisplayNameEN}}</h2>
         <div class="star-number">{{.CurrentStars}}</div>
         <div class="star-label" data-i18n="current_stars">current stars</div>
@@ -46,7 +46,7 @@
     <h3 data-i18n="choose_reason">Choose a reason</h3>
     <div class="reason-list">
         {{range .Reasons}}
-        <div class="reason-item reason-trans" data-reason-id="{{.ID}}" data-en="{{index .Translations "en"}}" data-zh-cn="{{index .Translations "zh-CN"}}" data-zh-tw="{{index .Translations "zh-TW"}}" onclick="submitStarByReason({{.ID}})">
+        <div class="reason-item reason-trans" data-reason-id="{{.ID}}" data-en="{{index .Translations "en"}}" data-zh-cn="{{index .Translations "zh-CN"}}" data-zh-tw="{{index .Translations "zh-TW"}}" data-stars="{{.Stars}}" data-global-count="{{.Count}}" onclick="submitStarByReason({{.ID}})">
             <span class="reason-text">{{index .Translations "en"}}</span> <span class="reason-count">({{.Stars}} ⭐ × {{.Count}})</span>
         </div>
         {{end}}
@@ -62,7 +62,7 @@
     <h3 data-i18n="choose_reward">Choose a reward</h3>
     <div class="reason-list">
         {{range .Rewards}}
-        <div class="reason-item reward-trans" data-reward-id="{{.ID}}" data-en="{{index .Translations "en"}}" data-zh-cn="{{index .Translations "zh-CN"}}" data-zh-tw="{{index .Translations "zh-TW"}}" onclick="submitRedeem({{.ID}}, '{{index .Translations "en"}}', {{.Cost}})">{{.Icon}} <span class="reward-text">{{index .Translations "en"}}</span> <span class="reason-count">({{.Cost}} ⭐)</span></div>
+        <div class="reason-item reward-trans" data-reward-id="{{.ID}}" data-en="{{index .Translations "en"}}" data-zh-cn="{{index .Translations "zh-CN"}}" data-zh-tw="{{index .Translations "zh-TW"}}" data-adult-only="{{.ForAdults}}" onclick="submitRedeem({{.ID}}, '{{index .Translations "en"}}', {{.Cost}})">{{.Icon}} <span class="reward-text">{{index .Translations "en"}}</span> <span class="reason-count">({{.Cost}} ⭐)</span></div>
         {{end}}
     </div>
 </div>
@@ -107,5 +107,14 @@
         {{end}}
     </tbody>
 </table>
+{{if .User.IsAdmin}}
+<script>
+var userReasonCounts = {{.UserReasonCounts}};
+var usernameToId = {};
+document.querySelectorAll('.member-card[data-userid]').forEach(function(c) {
+    usernameToId[c.dataset.username] = parseInt(c.dataset.userid);
+});
+</script>
+{{end}}
 {{end}}
 {{template "layout" .}}

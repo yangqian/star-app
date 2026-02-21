@@ -61,6 +61,9 @@ function updateSelection() {
     }
     document.getElementById('reasonPanel').style.display = 'none';
     document.getElementById('redeemPanel').style.display = 'none';
+    // Sort reasons by user frequency and filter rewards by role
+    sortReasonsByUser();
+    filterRewardsByRole();
     // Sync filter buttons
     syncFilterButtons();
 }
@@ -131,6 +134,8 @@ function togglePanel(id) {
             p.style.display = 'none';
         }
     });
+    if (id === 'reasonPanel') sortReasonsByUser();
+    if (id === 'redeemPanel') filterRewardsByRole();
 }
 
 function updateStarCounts(counts) {
@@ -602,6 +607,91 @@ function toggleAnnounce() {
         var dict = translations[currentLang] || translations.en;
         span.textContent = on ? (dict.announce_on || 'On') : (dict.announce_off || 'Off');
         span.setAttribute('data-i18n', on ? 'announce_on' : 'announce_off');
+    });
+}
+
+function toggleAdultOnly(rewardId, checked) {
+    var body = new URLSearchParams({adult_only: checked ? '1' : '0'});
+    fetch("/admin/reward/" + rewardId, {
+        method: "PUT",
+        body: body
+    })
+    .then(function(resp) { return resp.json(); });
+}
+
+function filterRewardsByRole() {
+    var redeemPanel = document.getElementById('redeemPanel');
+    if (!redeemPanel) return;
+
+    // Determine roles of selected users
+    var hasKid = false, hasAdult = false;
+    selectedUsers.forEach(function(u) {
+        var card = document.querySelector('.member-card[data-username="' + u + '"]');
+        if (card) {
+            if (card.dataset.role === 'kid') hasKid = true;
+            else hasAdult = true;
+        }
+    });
+
+    redeemPanel.querySelectorAll('.reason-item[data-adult-only]').forEach(function(item) {
+        var isAdultOnly = item.dataset.adultOnly === 'true';
+        if (hasKid && hasAdult) {
+            // Mixed selection: show all
+            item.style.display = '';
+        } else if (hasKid) {
+            // Kids only: hide adult rewards
+            item.style.display = isAdultOnly ? 'none' : '';
+        } else {
+            // Adults only or no selection: show all
+            item.style.display = '';
+        }
+    });
+}
+
+function sortReasonsByUser() {
+    if (typeof userReasonCounts === 'undefined') return;
+    var reasonList = document.querySelector('#reasonPanel .reason-list');
+    if (!reasonList) return;
+
+    // Get user IDs for selected users
+    var selectedUserIds = selectedUsers.map(function(u) {
+        return usernameToId[u];
+    }).filter(function(id) { return id !== undefined; });
+
+    var items = Array.from(reasonList.querySelectorAll('.reason-item[data-reason-id]'));
+    items.forEach(function(item) {
+        var reasonId = parseInt(item.dataset.reasonId);
+        var globalCount = parseInt(item.dataset.globalCount) || 0;
+        var starCount = parseInt(item.dataset.stars) || 1;
+        var personalCount = 0;
+        selectedUserIds.forEach(function(uid) {
+            if (userReasonCounts[uid] && userReasonCounts[uid][reasonId]) {
+                personalCount += userReasonCounts[uid][reasonId];
+            }
+        });
+
+        item._personalCount = personalCount;
+        item._globalCount = globalCount;
+
+        // Update displayed count
+        var countEl = item.querySelector('.reason-count');
+        if (countEl) {
+            if (personalCount > 0) {
+                countEl.textContent = '(' + starCount + ' ⭐ × ' + personalCount + '/' + globalCount + ')';
+            } else {
+                countEl.textContent = '(' + starCount + ' ⭐ × ' + globalCount + ')';
+            }
+        }
+    });
+
+    // Sort: personal count DESC, then global count DESC
+    items.sort(function(a, b) {
+        if (b._personalCount !== a._personalCount) return b._personalCount - a._personalCount;
+        return b._globalCount - a._globalCount;
+    });
+
+    items.forEach(function(item) {
+        reasonList.appendChild(item);
     });
 }
 
