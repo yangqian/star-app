@@ -3,3 +3,5 @@ star-app-arm64
 *.db
 Makefile
 .claude/
+*.db-shm
+*.db-wal
