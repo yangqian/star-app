@@ -508,7 +508,7 @@ Import previously exported JSON data. Replaces all existing stars, reasons, rewa
 Configure from the admin panel under "Home Assistant Announce":
 
 1. Enable announcements
-2. Set your Home Assistant URL (e.g., `https://home.example.com`)
+2. Set your Home Assistant TTS URL (e.g., `https://home.example.com/api/services/tts/microsoft_say`)
 3. Set a Long-Lived Access Token (generate from HA user profile)
 4. Set the media player entity (e.g., `media_player.living_room`)
 5. Choose the announcement language
