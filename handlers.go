@@ -8,15 +8,25 @@ import (
 	"html/template"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
-func randomHex(n int) string {
+func randomHex(n int) (string, error) {
 	b := make([]byte, n)
-	rand.Read(b)
-	return hex.EncodeToString(b)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
+}
+
+func sessionCookieSecure(r *http.Request) bool {
+	if r.TLS != nil {
+		return true
+	}
+	return strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
 }
 
 func handleDashboard(w http.ResponseWriter, r *http.Request) {
@@ -137,8 +147,17 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token := randomHex(32)
-	createSession(token, user.ID)
+	token, err := randomHex(32)
+	if err != nil {
+		http.Error(w, "failed to create session", http.StatusInternalServerError)
+		return
+	}
+	if err := createSession(token, user.ID); err != nil {
+		http.Error(w, "failed to create session", http.StatusInternalServerError)
+		return
+	}
+
+	const sessionMaxAgeSeconds = 365 * 24 * 60 * 60
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session",
@@ -146,7 +165,9 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		MaxAge:   10 * 365 * 24 * 60 * 60, // ~10 years
+		Secure:   sessionCookieSecure(r),
+		MaxAge:   sessionMaxAgeSeconds,
+		Expires:  time.Now().Add(30 * 24 * time.Hour),
 	})
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
@@ -157,10 +178,13 @@ func handleLogout(w http.ResponseWriter, r *http.Request) {
 		deleteSession(cookie.Value)
 	}
 	http.SetCookie(w, &http.Cookie{
-		Name:   "session",
-		Value:  "",
-		Path:   "/",
-		MaxAge: -1,
+		Name:     "session",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   sessionCookieSecure(r),
+		MaxAge:   -1,
 	})
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
@@ -628,7 +652,11 @@ func handleAddStar(w http.ResponseWriter, r *http.Request) {
 
 func handleGenerateAPIKey(w http.ResponseWriter, r *http.Request) {
 	label := r.FormValue("label")
-	key := randomHex(32)
+	key, err := randomHex(32)
+	if err != nil {
+		http.Error(w, "failed to create API key", http.StatusInternalServerError)
+		return
+	}
 	keyHash := hashAPIKey(key)
 
 	if err := addAPIKey(keyHash, label); err != nil {
@@ -719,7 +747,6 @@ func handleImport(w http.ResponseWriter, r *http.Request) {
 
 	http.Redirect(w, r, "/admin", http.StatusSeeOther)
 }
-
 
 // API handlers
 

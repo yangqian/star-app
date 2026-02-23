@@ -18,6 +18,7 @@ type Star struct {
 	UsernameCN      string
 	UsernameTW      string
 	ReasonID        *int
+	ReasonKey       string
 	ReasonText      string
 	Reason          string
 	Stars           int
@@ -51,6 +52,7 @@ type SessionData struct {
 
 type Reward struct {
 	ID           int
+	Key          string
 	Name         string
 	Cost         int
 	Icon         string
@@ -65,6 +67,8 @@ type Redemption struct {
 	UsernameEN   string
 	UsernameCN   string
 	UsernameTW   string
+	RewardID     int
+	RewardKey    string
 	RewardName   string
 	RewardNameEN string
 	RewardNameCN string

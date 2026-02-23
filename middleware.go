@@ -59,7 +59,9 @@ func authAPI(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		key := r.Header.Get("X-API-Key")
 		if key == "" || !validateAPIKey(key) {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte(`{"error":"unauthorized"}`))
 			return
 		}
 		next(w, r)

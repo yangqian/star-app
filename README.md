@@ -47,12 +47,14 @@ GOOS=linux GOARCH=arm64 go build -o star-app-arm64 .
 
 On first run with an empty database, four accounts are seeded:
 
-| Username | Password   | Role   |
-|----------|------------|--------|
-| `dad`    | `changeme` | Parent |
-| `mom`    | `changeme` | Parent |
-| `theo`   | `changeme` | Kid    |
-| `ray`    | `changeme` | Kid    |
+| Username | Password | Role   |
+|----------|----------|--------|
+| `dad`    | Generated at startup (printed to stdout) | Parent |
+| `mom`    | Generated at startup (printed to stdout) | Parent |
+| `theo`   | Generated at startup (printed to stdout) | Kid    |
+| `ray`    | Generated at startup (printed to stdout) | Kid    |
+
+Set `STAR_APP_DEFAULT_PASSWORD` before first startup if you want one fixed bootstrap password for all seeded accounts.
 
 Accounts can be added and removed from the admin panel.
 

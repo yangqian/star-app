@@ -4,11 +4,15 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"os"
+	"sort"
+	"strings"
 	"time"
 
-	_ "modernc.org/sqlite"
 	"golang.org/x/crypto/bcrypt"
+	_ "modernc.org/sqlite"
 )
 
 var db *sql.DB
@@ -308,17 +312,27 @@ func seedUsers() error {
 
 	users := []struct {
 		username string
-		password string
 		isAdmin  bool
 	}{
-		{"dad", "changeme", true},
-		{"mom", "changeme", true},
-		{"theo", "changeme", false},
-		{"ray", "changeme", false},
+		{"dad", true},
+		{"mom", true},
+		{"theo", false},
+		{"ray", false},
 	}
 
+	defaultPassword := strings.TrimSpace(os.Getenv("STAR_APP_DEFAULT_PASSWORD"))
+	credentials := make(map[string]string, len(users))
+
 	for _, u := range users {
-		hash, err := bcrypt.GenerateFromPassword([]byte(u.password), bcrypt.DefaultCost)
+		password := defaultPassword
+		if password == "" {
+			generated, err := randomHex(10)
+			if err != nil {
+				return fmt.Errorf("failed to generate seed password: %w", err)
+			}
+			password = generated
+		}
+		hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 		if err != nil {
 			return err
 		}
@@ -327,8 +341,21 @@ func seedUsers() error {
 		if err != nil {
 			return err
 		}
+		credentials[u.username] = password
 	}
-	fmt.Println("Seeded default users (password: changeme): dad, mom, theo, ray")
+
+	names := make([]string, 0, len(credentials))
+	for username := range credentials {
+		names = append(names, username)
+	}
+	sort.Strings(names)
+
+	fmt.Println("Seeded default users with temporary passwords:")
+	for _, username := range names {
+		fmt.Printf("  %s: %s\n", username, credentials[username])
+	}
+	fmt.Println("Change these passwords immediately from Account settings.")
+
 	return nil
 }
 
@@ -532,9 +559,10 @@ func getUserReasonCounts() (map[int]map[int]int, error) {
 }
 
 func getStars(filterUsername string) ([]Star, error) {
-	query := `SELECT s.id, s.user_id, u.username, s.reason_id, s.reason_text, s.stars, s.awarded_by, COALESCE(a.username,''), s.created_at
+	query := `SELECT s.id, s.user_id, u.username, s.reason_id, COALESCE(r.key, ''), s.reason_text, s.stars, s.awarded_by, COALESCE(a.username,''), s.created_at
 		FROM stars s
 		JOIN users u ON s.user_id = u.id
+		LEFT JOIN reasons r ON s.reason_id = r.id
 		LEFT JOIN users a ON s.awarded_by = a.id`
 	var args []interface{}
 	if filterUsername != "" {
@@ -552,9 +580,10 @@ func getStars(filterUsername string) ([]Star, error) {
 	var stars []Star
 	for rows.Next() {
 		var s Star
+		var reasonKey sql.NullString
 		var reasonText sql.NullString
 		var createdAtStr sql.NullString
-		err := rows.Scan(&s.ID, &s.UserID, &s.Username, &s.ReasonID, &reasonText, &s.Stars, &s.AwardedBy, &s.AwardedByName, &createdAtStr)
+		err := rows.Scan(&s.ID, &s.UserID, &s.Username, &s.ReasonID, &reasonKey, &reasonText, &s.Stars, &s.AwardedBy, &s.AwardedByName, &createdAtStr)
 		if err != nil {
 			fmt.Printf("Error scanning star row: %v\n", err)
 			continue
@@ -570,6 +599,10 @@ func getStars(filterUsername string) ([]Star, error) {
 			s.AwardedByNameEN = getUserText(s.AwardedBy, "en")
 			s.AwardedByNameCN = getUserText(s.AwardedBy, "zh-CN")
 			s.AwardedByNameTW = getUserText(s.AwardedBy, "zh-TW")
+		}
+
+		if reasonKey.Valid {
+			s.ReasonKey = reasonKey.String
 		}
 
 		// Handle NULL reason_text
@@ -846,7 +879,7 @@ func deleteSession(token string) error {
 }
 
 func getRewardsList() ([]Reward, error) {
-	rows, err := db.Query("SELECT id, cost, icon, COALESCE(adult_only, 0) FROM rewards ORDER BY cost ASC")
+	rows, err := db.Query("SELECT id, key, cost, icon, COALESCE(adult_only, 0) FROM rewards ORDER BY cost ASC")
 	if err != nil {
 		return nil, err
 	}
@@ -856,7 +889,7 @@ func getRewardsList() ([]Reward, error) {
 	for rows.Next() {
 		var r Reward
 		r.Translations = make(map[string]string)
-		rows.Scan(&r.ID, &r.Cost, &r.Icon, &r.ForAdults)
+		rows.Scan(&r.ID, &r.Key, &r.Cost, &r.Icon, &r.ForAdults)
 
 		// Load all translations for this reward
 		tRows, _ := db.Query("SELECT lang, text FROM reward_translations WHERE reward_id = ?", r.ID)
@@ -967,8 +1000,8 @@ func deleteRewardByID(id int) error {
 func getRewardByID(id int) (*Reward, error) {
 	r := &Reward{}
 	r.Translations = make(map[string]string)
-	err := db.QueryRow("SELECT id, cost, icon, COALESCE(adult_only, 0) FROM rewards WHERE id = ?", id).
-		Scan(&r.ID, &r.Cost, &r.Icon, &r.ForAdults)
+	err := db.QueryRow("SELECT id, key, cost, icon, COALESCE(adult_only, 0) FROM rewards WHERE id = ?", id).
+		Scan(&r.ID, &r.Key, &r.Cost, &r.Icon, &r.ForAdults)
 	if err != nil {
 		return nil, err
 	}
@@ -1013,11 +1046,150 @@ func setSetting(key, value string) error {
 	return err
 }
 
+func valueAsString(v interface{}) (string, bool) {
+	switch value := v.(type) {
+	case string:
+		return strings.TrimSpace(value), true
+	default:
+		return "", false
+	}
+}
+
+func valueAsInt(v interface{}) (int, bool) {
+	switch value := v.(type) {
+	case int:
+		return value, true
+	case int64:
+		return int(value), true
+	case float64:
+		return int(value), true
+	case float32:
+		return int(value), true
+	default:
+		return 0, false
+	}
+}
+
+func valueAsBool(v interface{}) (bool, bool) {
+	switch value := v.(type) {
+	case bool:
+		return value, true
+	case string:
+		switch strings.ToLower(strings.TrimSpace(value)) {
+		case "1", "true", "yes", "on":
+			return true, true
+		case "0", "false", "no", "off":
+			return false, true
+		default:
+			return false, false
+		}
+	default:
+		return false, false
+	}
+}
+
+func valueAsMap(v interface{}) (map[string]interface{}, bool) {
+	value, ok := v.(map[string]interface{})
+	return value, ok
+}
+
+func valueAsSlice(v interface{}) ([]interface{}, bool) {
+	value, ok := v.([]interface{})
+	return value, ok
+}
+
+func valueAsStringMap(v interface{}) map[string]string {
+	result := make(map[string]string)
+	entries, ok := valueAsMap(v)
+	if !ok {
+		return result
+	}
+
+	for lang, raw := range entries {
+		if text, ok := valueAsString(raw); ok && text != "" {
+			result[lang] = text
+		}
+	}
+	return result
+}
+
+func parseImportedTime(v interface{}) (time.Time, bool) {
+	switch value := v.(type) {
+	case time.Time:
+		if value.IsZero() {
+			return time.Time{}, false
+		}
+		return value, true
+	case string:
+		if value == "" {
+			return time.Time{}, false
+		}
+		if t, err := time.Parse(time.RFC3339, value); err == nil {
+			return t, true
+		}
+		if t, err := time.Parse("2006-01-02 15:04:05", value); err == nil {
+			return t, true
+		}
+	}
+	return time.Time{}, false
+}
+
+func normalizeImportKey(rawKey, fallback string) string {
+	key := strings.TrimSpace(rawKey)
+	if key == "" {
+		key = sanitizeKey(fallback)
+	}
+	if key == "" {
+		key = "custom"
+	}
+	if strings.ContainsAny(key, " \t\r\n") {
+		key = sanitizeKey(key)
+	}
+	return key
+}
+
+func uniqueKeyTx(tx *sql.Tx, baseKey, table, column string) (string, error) {
+	key := baseKey
+	for i := 2; ; i++ {
+		var count int
+		if err := tx.QueryRow("SELECT COUNT(*) FROM "+table+" WHERE "+column+" = ?", key).Scan(&count); err != nil {
+			return "", err
+		}
+		if count == 0 {
+			return key, nil
+		}
+		key = fmt.Sprintf("%s_%d", baseKey, i)
+	}
+}
+
+func lookupUserIDTx(tx *sql.Tx, cache map[string]int, username string) (int, error) {
+	username = strings.TrimSpace(username)
+	if username == "" {
+		return 0, errors.New("empty username")
+	}
+	if id, ok := cache[username]; ok {
+		return id, nil
+	}
+
+	var userID int
+	err := tx.QueryRow("SELECT id FROM users WHERE username = ?", username).Scan(&userID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, fmt.Errorf("user %q not found", username)
+		}
+		return 0, err
+	}
+	cache[username] = userID
+	return userID, nil
+}
+
 func exportAllData() (map[string]interface{}, error) {
 	data := make(map[string]interface{})
 
-	// Export users (without password hashes for security)
-	users, _ := getAllUsers()
+	users, err := getAllUsers()
+	if err != nil {
+		return nil, fmt.Errorf("failed to export users: %w", err)
+	}
 	var userExport []map[string]interface{}
 	for _, u := range users {
 		userExport = append(userExport, map[string]interface{}{
@@ -1028,26 +1200,33 @@ func exportAllData() (map[string]interface{}, error) {
 	}
 	data["users"] = userExport
 
-	// Export stars
-	stars, _ := getStars("")
+	stars, err := getStars("")
+	if err != nil {
+		return nil, fmt.Errorf("failed to export stars: %w", err)
+	}
 	var starExport []map[string]interface{}
 	for _, s := range stars {
 		starExport = append(starExport, map[string]interface{}{
-			"username":   s.Username,
-			"reason_id":  s.ReasonID,
+			"username":    s.Username,
+			"reason_id":   s.ReasonID,
+			"reason_key":  s.ReasonKey,
 			"reason_text": s.ReasonText,
-			"stars":      s.Stars,
-			"awarded_by": s.AwardedByName,
-			"created_at": s.CreatedAt,
+			"reason_en":   getReasonText(s.ReasonID, s.ReasonText, "en"),
+			"stars":       s.Stars,
+			"awarded_by":  s.AwardedByName,
+			"created_at":  s.CreatedAt,
 		})
 	}
 	data["stars"] = starExport
 
-	// Export reasons
-	reasons, _ := getReasons()
+	reasons, err := getReasons()
+	if err != nil {
+		return nil, fmt.Errorf("failed to export reasons: %w", err)
+	}
 	var reasonExport []map[string]interface{}
 	for _, r := range reasons {
 		reasonExport = append(reasonExport, map[string]interface{}{
+			"id":           r.ID,
 			"key":          r.Key,
 			"translations": r.Translations,
 			"stars":        r.Stars,
@@ -1055,12 +1234,16 @@ func exportAllData() (map[string]interface{}, error) {
 	}
 	data["reasons"] = reasonExport
 
-	// Export rewards
-	rewards, _ := getRewardsList()
+	rewards, err := getRewardsList()
+	if err != nil {
+		return nil, fmt.Errorf("failed to export rewards: %w", err)
+	}
 	var rewardExport []map[string]interface{}
 	for _, r := range rewards {
 		rewardExport = append(rewardExport, map[string]interface{}{
-			"key":          r.Name,
+			"id":           r.ID,
+			"key":          r.Key,
+			"name":         r.Name,
 			"cost":         r.Cost,
 			"icon":         r.Icon,
 			"adult_only":   r.ForAdults,
@@ -1069,12 +1252,16 @@ func exportAllData() (map[string]interface{}, error) {
 	}
 	data["rewards"] = rewardExport
 
-	// Export redemptions
-	redemptions, _ := getRecentRedemptions(10000, 0)
+	redemptions, err := getRecentRedemptions(10000, 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to export redemptions: %w", err)
+	}
 	var redemptionExport []map[string]interface{}
 	for _, r := range redemptions {
 		redemptionExport = append(redemptionExport, map[string]interface{}{
 			"username":    r.Username,
+			"reward_id":   r.RewardID,
+			"reward_key":  r.RewardKey,
 			"reward_name": r.RewardName,
 			"cost":        r.Cost,
 			"created_at":  r.CreatedAt,
@@ -1082,7 +1269,6 @@ func exportAllData() (map[string]interface{}, error) {
 	}
 	data["redemptions"] = redemptionExport
 
-	// Export settings
 	settings := map[string]string{
 		"ha_enabled":      getSetting("ha_enabled"),
 		"ha_url":          getSetting("ha_url"),
@@ -1096,97 +1282,394 @@ func exportAllData() (map[string]interface{}, error) {
 }
 
 func importAllData(data map[string]interface{}) error {
-	// Note: This is a basic implementation. In production, you'd want to:
-	// 1. Validate the data structure
-	// 2. Use transactions
-	// 3. Handle conflicts better
-	// 4. Create backups before importing
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to start import transaction: %w", err)
+	}
 
-	// Clear existing data (except users for security)
-	db.Exec("DELETE FROM redemptions")
-	db.Exec("DELETE FROM stars")
-	db.Exec("DELETE FROM reason_translations")
-	db.Exec("DELETE FROM reasons")
-	db.Exec("DELETE FROM reward_translations")
-	db.Exec("DELETE FROM rewards")
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
 
-	// Import reasons
-	if reasons, ok := data["reasons"].([]interface{}); ok {
-		for _, item := range reasons {
-			r := item.(map[string]interface{})
-			key := r["key"].(string)
-			stars := int(r["stars"].(float64))
-			result, _ := db.Exec("INSERT INTO reasons (key, stars) VALUES (?, ?)", key, stars)
-			id, _ := result.LastInsertId()
+	queries := []string{
+		"DELETE FROM redemptions",
+		"DELETE FROM stars",
+		"DELETE FROM reason_translations",
+		"DELETE FROM reasons",
+		"DELETE FROM reward_translations",
+		"DELETE FROM rewards",
+	}
+	for _, query := range queries {
+		if _, err := tx.Exec(query); err != nil {
+			return fmt.Errorf("failed to clear existing data: %w", err)
+		}
+	}
 
-			// Import translations
-			if trans, ok := r["translations"].(map[string]interface{}); ok {
-				for lang, text := range trans {
-					db.Exec("INSERT INTO reason_translations (reason_id, lang, text) VALUES (?, ?, ?)", id, lang, text)
-				}
+	userIDCache := map[string]int{}
+	reasonIDByKey := map[string]int{}
+	reasonIDByEN := map[string]int{}
+	reasonIDByLegacyID := map[int]int{}
+	rewardIDByKey := map[string]int{}
+	rewardIDByEN := map[string]int{}
+	rewardIDByLegacyID := map[int]int{}
+
+	insertReason := func(rawKey string, stars int, translations map[string]string, legacyID int) (int, error) {
+		enText := strings.TrimSpace(translations["en"])
+		keyBase := normalizeImportKey(rawKey, enText)
+		key, err := uniqueKeyTx(tx, keyBase, "reasons", "key")
+		if err != nil {
+			return 0, err
+		}
+
+		result, err := tx.Exec("INSERT INTO reasons (key, stars) VALUES (?, ?)", key, stars)
+		if err != nil {
+			return 0, err
+		}
+		id64, err := result.LastInsertId()
+		if err != nil {
+			return 0, err
+		}
+		reasonID := int(id64)
+
+		if enText == "" {
+			enText = strings.TrimSpace(rawKey)
+		}
+		if enText == "" {
+			enText = key
+		}
+		translations["en"] = enText
+
+		for lang, text := range translations {
+			if strings.TrimSpace(lang) == "" || strings.TrimSpace(text) == "" {
+				continue
+			}
+			if _, err := tx.Exec("INSERT INTO reason_translations (reason_id, lang, text) VALUES (?, ?, ?)", reasonID, lang, text); err != nil {
+				return 0, err
+			}
+		}
+
+		reasonIDByKey[key] = reasonID
+		if rawKey != "" {
+			reasonIDByKey[rawKey] = reasonID
+		}
+		reasonIDByEN[enText] = reasonID
+		if legacyID > 0 {
+			reasonIDByLegacyID[legacyID] = reasonID
+		}
+		return reasonID, nil
+	}
+
+	rewardsHasLegacyName := columnExists("rewards", "name")
+	insertReward := func(rawKey string, cost int, icon string, adultOnly bool, translations map[string]string, legacyID int) (int, error) {
+		if cost < 1 {
+			cost = 1
+		}
+		enText := strings.TrimSpace(translations["en"])
+		keyBase := normalizeImportKey(rawKey, enText)
+		key, err := uniqueKeyTx(tx, keyBase, "rewards", "key")
+		if err != nil {
+			return 0, err
+		}
+
+		if enText == "" {
+			enText = strings.TrimSpace(rawKey)
+		}
+		if enText == "" {
+			enText = key
+		}
+		translations["en"] = enText
+
+		var result sql.Result
+		if rewardsHasLegacyName {
+			result, err = tx.Exec("INSERT INTO rewards (name, key, cost, icon, adult_only) VALUES (?, ?, ?, ?, ?)", enText, key, cost, icon, adultOnly)
+		} else {
+			result, err = tx.Exec("INSERT INTO rewards (key, cost, icon, adult_only) VALUES (?, ?, ?, ?)", key, cost, icon, adultOnly)
+		}
+		if err != nil {
+			return 0, err
+		}
+		id64, err := result.LastInsertId()
+		if err != nil {
+			return 0, err
+		}
+		rewardID := int(id64)
+
+		for lang, text := range translations {
+			if strings.TrimSpace(lang) == "" || strings.TrimSpace(text) == "" {
+				continue
+			}
+			if _, err := tx.Exec("INSERT INTO reward_translations (reward_id, lang, text) VALUES (?, ?, ?)", rewardID, lang, text); err != nil {
+				return 0, err
+			}
+		}
+
+		rewardIDByKey[key] = rewardID
+		if rawKey != "" {
+			rewardIDByKey[rawKey] = rewardID
+		}
+		rewardIDByEN[enText] = rewardID
+		if legacyID > 0 {
+			rewardIDByLegacyID[legacyID] = rewardID
+		}
+		return rewardID, nil
+	}
+
+	if rawReasons, ok := data["reasons"]; ok {
+		reasons, ok := valueAsSlice(rawReasons)
+		if !ok {
+			return errors.New("invalid reasons payload")
+		}
+		for i, item := range reasons {
+			entry, ok := valueAsMap(item)
+			if !ok {
+				return fmt.Errorf("invalid reasons entry at index %d", i)
+			}
+			key, _ := valueAsString(entry["key"])
+			stars, hasStars := valueAsInt(entry["stars"])
+			if !hasStars {
+				stars = 1
+			}
+			translations := valueAsStringMap(entry["translations"])
+			if enText, ok := valueAsString(entry["text"]); ok && translations["en"] == "" {
+				translations["en"] = enText
+			}
+			legacyID, _ := valueAsInt(entry["id"])
+			if _, err := insertReason(key, stars, translations, legacyID); err != nil {
+				return fmt.Errorf("failed to import reason at index %d: %w", i, err)
 			}
 		}
 	}
 
-	// Import rewards
-	if rewards, ok := data["rewards"].([]interface{}); ok {
-		for _, item := range rewards {
-			r := item.(map[string]interface{})
-			key := r["key"].(string)
-			cost := int(r["cost"].(float64))
-			icon := r["icon"].(string)
-			adultOnly := false
-			if ao, ok := r["adult_only"].(bool); ok {
-				adultOnly = ao
+	if rawRewards, ok := data["rewards"]; ok {
+		rewards, ok := valueAsSlice(rawRewards)
+		if !ok {
+			return errors.New("invalid rewards payload")
+		}
+		for i, item := range rewards {
+			entry, ok := valueAsMap(item)
+			if !ok {
+				return fmt.Errorf("invalid rewards entry at index %d", i)
 			}
-			result, _ := db.Exec("INSERT INTO rewards (key, cost, icon, adult_only) VALUES (?, ?, ?, ?)", key, cost, icon, adultOnly)
-			id, _ := result.LastInsertId()
+			key, _ := valueAsString(entry["key"])
+			legacyName, _ := valueAsString(entry["name"])
+			if key == "" {
+				key = legacyName
+			}
 
-			// Import translations
-			if trans, ok := r["translations"].(map[string]interface{}); ok {
-				for lang, text := range trans {
-					db.Exec("INSERT INTO reward_translations (reward_id, lang, text) VALUES (?, ?, ?)", id, lang, text)
-				}
+			cost, hasCost := valueAsInt(entry["cost"])
+			if !hasCost {
+				cost = 1
+			}
+			icon, _ := valueAsString(entry["icon"])
+			adultOnly, _ := valueAsBool(entry["adult_only"])
+			translations := valueAsStringMap(entry["translations"])
+			if legacyName != "" && translations["en"] == "" {
+				translations["en"] = legacyName
+			}
+			legacyID, _ := valueAsInt(entry["id"])
+			if _, err := insertReward(key, cost, icon, adultOnly, translations, legacyID); err != nil {
+				return fmt.Errorf("failed to import reward at index %d: %w", i, err)
 			}
 		}
 	}
 
-	// Import user translations (don't modify user accounts for security)
-	if users, ok := data["users"].([]interface{}); ok {
-		for _, item := range users {
-			u := item.(map[string]interface{})
-			username := u["username"].(string)
-
-			// Get user ID
-			user, err := getUserByUsername(username)
+	if rawUsers, ok := data["users"]; ok {
+		users, ok := valueAsSlice(rawUsers)
+		if !ok {
+			return errors.New("invalid users payload")
+		}
+		for i, item := range users {
+			entry, ok := valueAsMap(item)
+			if !ok {
+				return fmt.Errorf("invalid users entry at index %d", i)
+			}
+			username, _ := valueAsString(entry["username"])
+			if username == "" {
+				continue
+			}
+			userID, err := lookupUserIDTx(tx, userIDCache, username)
 			if err != nil {
-				continue // Skip if user doesn't exist
+				return fmt.Errorf("failed to import user translations at index %d: %w", i, err)
 			}
-
-			// Clear existing translations
-			db.Exec("DELETE FROM user_translations WHERE user_id = ?", user.ID)
-
-			// Import translations
-			if trans, ok := u["translations"].(map[string]interface{}); ok {
-				for lang, text := range trans {
-					db.Exec("INSERT INTO user_translations (user_id, lang, text) VALUES (?, ?, ?)", user.ID, lang, text)
+			if _, err := tx.Exec("DELETE FROM user_translations WHERE user_id = ?", userID); err != nil {
+				return err
+			}
+			for lang, text := range valueAsStringMap(entry["translations"]) {
+				if _, err := tx.Exec("INSERT INTO user_translations (user_id, lang, text) VALUES (?, ?, ?)", userID, lang, text); err != nil {
+					return err
 				}
 			}
 		}
 	}
 
-	// Import settings
-	if settings, ok := data["settings"].(map[string]interface{}); ok {
-		for key, value := range settings {
-			setSetting(key, value.(string))
+	if rawStars, ok := data["stars"]; ok {
+		stars, ok := valueAsSlice(rawStars)
+		if !ok {
+			return errors.New("invalid stars payload")
+		}
+		for i, item := range stars {
+			entry, ok := valueAsMap(item)
+			if !ok {
+				return fmt.Errorf("invalid stars entry at index %d", i)
+			}
+
+			username, _ := valueAsString(entry["username"])
+			userID, err := lookupUserIDTx(tx, userIDCache, username)
+			if err != nil {
+				return fmt.Errorf("failed to import star at index %d: %w", i, err)
+			}
+
+			starsValue, hasStars := valueAsInt(entry["stars"])
+			if !hasStars {
+				starsValue = 1
+			}
+
+			reasonText, _ := valueAsString(entry["reason_text"])
+			if reasonText == "" {
+				reasonText, _ = valueAsString(entry["reason_en"])
+			}
+
+			var reasonID *int
+			if legacyReasonID, ok := valueAsInt(entry["reason_id"]); ok && legacyReasonID > 0 {
+				if mapped, found := reasonIDByLegacyID[legacyReasonID]; found {
+					reasonID = &mapped
+				}
+			}
+			if reasonID == nil {
+				if reasonKey, ok := valueAsString(entry["reason_key"]); ok && reasonKey != "" {
+					if mapped, found := reasonIDByKey[reasonKey]; found {
+						reasonID = &mapped
+					}
+				}
+			}
+			if reasonID == nil && reasonText != "" {
+				if mapped, found := reasonIDByEN[reasonText]; found {
+					reasonID = &mapped
+				}
+			}
+			if reasonID == nil && reasonText != "" {
+				reasonKey, _ := valueAsString(entry["reason_key"])
+				mapped, err := insertReason(reasonKey, starsValue, map[string]string{"en": reasonText}, 0)
+				if err != nil {
+					return fmt.Errorf("failed to create reason for star at index %d: %w", i, err)
+				}
+				reasonID = &mapped
+			}
+
+			var awardedBy interface{}
+			if awardedByName, ok := valueAsString(entry["awarded_by"]); ok && awardedByName != "" {
+				awarderID, err := lookupUserIDTx(tx, userIDCache, awardedByName)
+				if err != nil {
+					return fmt.Errorf("failed to import star awarder at index %d: %w", i, err)
+				}
+				awardedBy = awarderID
+			}
+
+			var reasonTextValue interface{}
+			if reasonID == nil && reasonText != "" {
+				reasonTextValue = reasonText
+			}
+
+			createdAt, hasCreatedAt := parseImportedTime(entry["created_at"])
+			if hasCreatedAt {
+				_, err = tx.Exec("INSERT INTO stars (user_id, reason_id, reason_text, stars, awarded_by, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+					userID, reasonID, reasonTextValue, starsValue, awardedBy, createdAt.Format(time.RFC3339))
+			} else {
+				_, err = tx.Exec("INSERT INTO stars (user_id, reason_id, reason_text, stars, awarded_by) VALUES (?, ?, ?, ?, ?)",
+					userID, reasonID, reasonTextValue, starsValue, awardedBy)
+			}
+			if err != nil {
+				return fmt.Errorf("failed to insert star at index %d: %w", i, err)
+			}
 		}
 	}
 
+	if rawRedemptions, ok := data["redemptions"]; ok {
+		redemptions, ok := valueAsSlice(rawRedemptions)
+		if !ok {
+			return errors.New("invalid redemptions payload")
+		}
+		for i, item := range redemptions {
+			entry, ok := valueAsMap(item)
+			if !ok {
+				return fmt.Errorf("invalid redemptions entry at index %d", i)
+			}
+
+			username, _ := valueAsString(entry["username"])
+			userID, err := lookupUserIDTx(tx, userIDCache, username)
+			if err != nil {
+				return fmt.Errorf("failed to import redemption at index %d: %w", i, err)
+			}
+
+			rewardID := 0
+			if legacyRewardID, ok := valueAsInt(entry["reward_id"]); ok && legacyRewardID > 0 {
+				rewardID = rewardIDByLegacyID[legacyRewardID]
+			}
+			if rewardID == 0 {
+				if rewardKey, ok := valueAsString(entry["reward_key"]); ok && rewardKey != "" {
+					rewardID = rewardIDByKey[rewardKey]
+				}
+			}
+			if rewardID == 0 {
+				if rewardName, ok := valueAsString(entry["reward_name"]); ok && rewardName != "" {
+					rewardID = rewardIDByEN[rewardName]
+				}
+			}
+			if rewardID == 0 {
+				return fmt.Errorf("failed to import redemption at index %d: reward not found", i)
+			}
+
+			var cost interface{}
+			if parsedCost, ok := valueAsInt(entry["cost"]); ok {
+				cost = parsedCost
+			}
+
+			createdAt, hasCreatedAt := parseImportedTime(entry["created_at"])
+			if hasCreatedAt {
+				_, err = tx.Exec("INSERT INTO redemptions (user_id, reward_id, cost, created_at) VALUES (?, ?, ?, ?)",
+					userID, rewardID, cost, createdAt.Format(time.RFC3339))
+			} else {
+				_, err = tx.Exec("INSERT INTO redemptions (user_id, reward_id, cost) VALUES (?, ?, ?)",
+					userID, rewardID, cost)
+			}
+			if err != nil {
+				return fmt.Errorf("failed to insert redemption at index %d: %w", i, err)
+			}
+		}
+	}
+
+	if rawSettings, ok := data["settings"]; ok {
+		settings, ok := valueAsMap(rawSettings)
+		if !ok {
+			return errors.New("invalid settings payload")
+		}
+		for key, rawValue := range settings {
+			if rawValue == nil {
+				continue
+			}
+			value, ok := valueAsString(rawValue)
+			if !ok {
+				value = strings.TrimSpace(fmt.Sprintf("%v", rawValue))
+			}
+			if _, err := tx.Exec(`INSERT INTO settings (key, value) VALUES (?, ?)
+				ON CONFLICT(key) DO UPDATE SET value = ?`, key, value, value); err != nil {
+				return err
+			}
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit import: %w", err)
+	}
+	committed = true
 	return nil
 }
 
 func getRecentRedemptions(limit int, filterUserID int) ([]Redemption, error) {
-	query := `SELECT rd.id, rd.user_id, u.username, rd.reward_id, COALESCE(rd.cost, rw.cost), rd.created_at
+	query := `SELECT rd.id, rd.user_id, u.username, rd.reward_id, rw.key, COALESCE(rd.cost, rw.cost), rd.created_at
 		FROM redemptions rd
 		JOIN users u ON rd.user_id = u.id
 		JOIN rewards rw ON rd.reward_id = rw.id`
@@ -1206,9 +1689,8 @@ func getRecentRedemptions(limit int, filterUserID int) ([]Redemption, error) {
 	var results []Redemption
 	for rows.Next() {
 		var r Redemption
-		var rewardID int
 		var createdAtStr sql.NullString
-		err := rows.Scan(&r.ID, &r.UserID, &r.Username, &rewardID, &r.Cost, &createdAtStr)
+		err := rows.Scan(&r.ID, &r.UserID, &r.Username, &r.RewardID, &r.RewardKey, &r.Cost, &createdAtStr)
 		if err != nil {
 			fmt.Printf("Error scanning redemption row: %v\n", err)
 			continue
@@ -1220,9 +1702,9 @@ func getRecentRedemptions(limit int, filterUserID int) ([]Redemption, error) {
 		r.UsernameTW = getUserText(r.UserID, "zh-TW")
 
 		// Get all translations for this reward
-		r.RewardNameEN = getRewardText(rewardID, "en")
-		r.RewardNameCN = getRewardText(rewardID, "zh-CN")
-		r.RewardNameTW = getRewardText(rewardID, "zh-TW")
+		r.RewardNameEN = getRewardText(r.RewardID, "en")
+		r.RewardNameCN = getRewardText(r.RewardID, "zh-CN")
+		r.RewardNameTW = getRewardText(r.RewardID, "zh-TW")
 		r.RewardName = r.RewardNameEN // Keep for backward compatibility
 
 		// Parse the datetime string - modernc.org/sqlite returns RFC3339 format
